@@ -3,9 +3,13 @@ package net.runelite.client.plugins.viruzosbot;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import net.runelite.api.Actor;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.widgets.Widget;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
@@ -17,6 +21,8 @@ import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
+import net.runelite.client.plugins.microbot.util.menu.NewMenuEntry;
+import net.runelite.client.plugins.microbot.util.misc.Rs2UiHelper;
 import net.runelite.client.plugins.microbot.util.mouse.Mouse;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.player.Rs2PlayerModel;
@@ -44,6 +50,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,7 +59,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.nio.file.Paths.get;
@@ -743,5 +752,689 @@ public class ViruzFFABotScript extends Script
 	}
 	private void setCurrentThreshold(int val) { this.currentThreshold = val; }
 	private int getCurrentThreshold() { return this.currentThreshold; }
+
+	private long lastInCombatMs = 0L;
+	private boolean wasInFfaArea = false;
+
+	@Override
+	public boolean run() {
+		startSession();
+		mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
+			try {
+				if (!Microbot.isLoggedIn()) return;
+				if (!super.run()) return;
+				onLoop();
+			} catch (Exception ex) {
+				log.info("Error in main loop: " + ex.getMessage());
+			}
+		}, 0, 600, TimeUnit.MILLISECONDS);
+		return true;
+	}
+
+	@Override
+	public void shutdown() {
+		playerStats.save();
+		aiAssistant.saveModel();
+		sendDiscordEmbed("🛑 Stopped script");
+		super.shutdown();
+	}
+
+	private void startSession() {
+		Config.load();
+		loadAuthorizedUsers();
+		this.timer2 = new Timer();
+		initializeAreaMap();
+		removeBlockedNamesFromFile(this.filePath);
+		removeDuplicateNamesFromAllLists();
+		setNextPreventLogout();
+		readMainUserFile();
+		loadList();
+		loadBluePhatSet();
+		loadLureDragSet();
+		ensureAutoRetaliateOff();
+		playerStats.startSession();
+		this.sessionStartMs = System.currentTimeMillis();
+		this.nextAntiBanAtMs = System.currentTimeMillis() + Rs2Random.between(120000, 240000);
+		this.nextAttackListReloadAtMs = System.currentTimeMillis() + ATTACK_LIST_RELOAD_INTERVAL_MS;
+		this.nextUltradianUpdateMs = System.currentTimeMillis() + Rs2Random.between(600000, 1200000);
+		lastSwitchLevelForCurrentStyle = Rs2Player.getRealSkillLevel(Skill.ATTACK);
+		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
+		sendDiscordEmbed("✅ Script started");
+	}
+
+	private int getRandomThreshold() {
+		return ThreadLocalRandom.current().nextInt(5000, 10001);
+	}
+
+	public void handleMouseClick(Point point) {
+		if (this.guiHidden) {
+			if (this.guiToggleButton.contains(point)) {
+				this.guiHidden = false;
+				this.log("GUI shown");
+			}
+			return;
+		}
+		if (this.selectedLocation == null) {
+			return;
+		}
+		if (this.hideGuiButton.contains(point)) {
+			this.guiHidden = true;
+			this.log("GUI hidden");
+			return;
+		}
+		if (this.locationComboBox.contains(point)) {
+			this.comboBoxExpanded = !this.comboBoxExpanded;
+			this.log(this.comboBoxExpanded ? "Location dropdown expanded" : "Location dropdown collapsed");
+		} else if (this.comboBoxExpanded) {
+			for (int i = 0; i < this.locationOptions.size(); ++i) {
+				int optionY = this.locationComboBox.y + (i + 1) * 20;
+				Rectangle optionRect = new Rectangle(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
+				if (optionRect.contains(point)) {
+					this.selectedLocation = this.locationOptions.get(i);
+					this.currentArea = this.areaMap.get(this.selectedLocation);
+					this.log("Selected location: " + this.selectedLocation);
+					this.comboBoxExpanded = false;
+					return;
+				}
+			}
+			this.comboBoxExpanded = false;
+		} else if (this.attackBox.contains(point)) {
+			this.setAttackEnabled(!this.isAttackEnabled());
+			String state = this.isAttackEnabled() ? "On" : "Off";
+			this.log("Attack is set to " + state);
+		} else if (this.walkToTargetBox.contains(point)) {
+			this.setWalkToTargetEnabled(!this.isWalkToTargetEnabled());
+			String state = this.isWalkToTargetEnabled() ? "On" : "Off";
+			this.log("Walk to target is set to " + state);
+		} else if (this.quickprayerBox.contains(point)) {
+			this.setQuickprayersEnabled(!this.isQuickprayersEnabled());
+			String state = this.isQuickprayersEnabled() ? "On" : "Off";
+			this.log("Prayer is set to " + state);
+		} else if (this.prayerOffBox.contains(point)) {
+			this.setPrayerOffEnabled(!this.isPrayerOffEnabled());
+			String state = this.isPrayerOffEnabled() ? "On" : "Off";
+			this.log("Turn prayer off if no target is set to " + state);
+		} else if (this.switchPrayersBox.contains(point)) {
+			this.setSwitchPrayersEnabled(!this.isSwitchPrayersEnabled());
+			String state = this.isSwitchPrayersEnabled() ? "On" : "Off";
+			this.log("Switch prayers is set to " + state);
+		} else if (this.freeRoamBox.contains(point)) {
+			this.setFreeRoamEnabled(!this.isFreeRoamEnabled());
+			String state = this.isFreeRoamEnabled() ? "On" : "Off";
+			this.log("Free roam is set to " + state);
+		} else if (this.protectBluePhatsBox.contains(point)) {
+			this.setProtectBluePhatsEnabled(!this.isProtectBluePhatsEnabled());
+			String state = this.isProtectBluePhatsEnabled() ? "On" : "Off";
+			this.log("Protect BluePhats is set to " + state);
+		} else if (this.reportBox.contains(point)) {
+			this.setReportEnabled(!this.isReportEnabled());
+			String state = this.isReportEnabled() ? "On" : "Off";
+			this.log("Report is set to " + state);
+		} else if (this.chatGrabberBox.contains(point)) {
+			this.chatGrabberEnabled.set(!this.chatGrabberEnabled.get());
+			String state = this.chatGrabberEnabled.get() ? "On" : "Off";
+			this.log("Chat grabber is set to " + state);
+		} else if (this.focusPlayersBox.contains(point)) {
+			this.focusPlayersEnabled = !this.focusPlayersEnabled;
+			if (this.focusPlayersEnabled) {
+				SwingUtilities.invokeLater(() -> {
+					String input = JOptionPane.showInputDialog(null,
+							"Enter player name(s) to focus (comma-separated):",
+							"Focus Players", JOptionPane.PLAIN_MESSAGE);
+					if (input != null && !input.trim().isEmpty()) {
+						focusPlayerNames.clear();
+						for (String name : input.split(",")) {
+							String trimmed = name.trim().toLowerCase(Locale.ROOT);
+							if (!trimmed.isEmpty()) {
+								focusPlayerNames.add(trimmed);
+							}
+						}
+						this.log("Focus players set to: " + String.join(", ", focusPlayerNames));
+						sendDiscordEmbed("🎯 Focus players set to: **" + String.join(", ", focusPlayerNames) + "**");
+					} else {
+						focusPlayersEnabled = false;
+					}
+				});
+			} else {
+				focusPlayerNames.clear();
+				this.log("Focus players disabled");
+			}
+		} else if (this.lureMultiBox.contains(point)) {
+			this.lureMultiEnabled = !this.lureMultiEnabled;
+			if (this.lureMultiEnabled) {
+				this.noDragEnabled = false;
+			}
+			String state = this.lureMultiEnabled ? "On" : "Off";
+			this.log("Lure Multi is set to " + state);
+		} else if (this.scanHillsBox.contains(point)) {
+			if (!this.hillScanActive) {
+				this.hillScanEnabled = true;
+				this.log("Scan Hills requested");
+			}
+		} else if (this.noDragBox.contains(point)) {
+			this.noDragEnabled = !this.noDragEnabled;
+			if (this.noDragEnabled) {
+				this.lureMultiEnabled = false;
+			}
+			String state = this.noDragEnabled ? "On" : "Off";
+			this.log("No Drag is set to " + state);
+		} else if (this.unlistBox.contains(point)) {
+			this.unlistEnabled = !this.unlistEnabled;
+			if (this.unlistEnabled) {
+				SwingUtilities.invokeLater(() -> {
+					String input = JOptionPane.showInputDialog(null,
+							"Enter player name(s) to unlist (comma-separated):",
+							"Unlist", JOptionPane.PLAIN_MESSAGE);
+					if (input != null && !input.trim().isEmpty()) {
+						unlistNames(input);
+						unlistEnabled = false;
+					} else {
+						unlistEnabled = false;
+						this.log("Unlist cancelled");
+					}
+				});
+			} else {
+				this.log("Unlist disabled");
+			}
+		} else if (this.whitelistBox.contains(point)) {
+			this.whitelistEnabled = !this.whitelistEnabled;
+			if (this.whitelistEnabled) {
+				SwingUtilities.invokeLater(() -> {
+					String input = JOptionPane.showInputDialog(null,
+							"Enter player name(s) to whitelist (comma-separated):",
+							"Whitelist", JOptionPane.PLAIN_MESSAGE);
+					if (input != null && !input.trim().isEmpty()) {
+						whitelistNames(input);
+						whitelistEnabled = false;
+					} else {
+						whitelistEnabled = false;
+						this.log("Whitelist cancelled");
+					}
+				});
+			} else {
+				this.log("Whitelist disabled");
+			}
+		} else if (this.purgeListButton.contains(point)) {
+			this.purgeInactiveProfiles();
+		} else if (this.reEnergizeButton.contains(point)) {
+			this.reEnergize();
+		}
+	}
+
+	public boolean isPointInGui(Point p) {
+		if (this.guiHidden) {
+			return this.guiToggleButton.contains(p);
+		}
+		return this.hideGuiButton.contains(p)
+				|| this.locationComboBox.contains(p)
+				|| this.attackBox.contains(p)
+				|| this.walkToTargetBox.contains(p)
+				|| this.quickprayerBox.contains(p)
+				|| this.prayerOffBox.contains(p)
+				|| this.switchPrayersBox.contains(p)
+				|| this.freeRoamBox.contains(p)
+				|| this.protectBluePhatsBox.contains(p)
+				|| this.reportBox.contains(p)
+				|| this.chatGrabberBox.contains(p)
+				|| this.focusPlayersBox.contains(p)
+				|| this.lureMultiBox.contains(p)
+				|| this.scanHillsBox.contains(p)
+				|| this.noDragBox.contains(p)
+				|| this.unlistBox.contains(p)
+				|| this.whitelistBox.contains(p)
+				|| this.purgeListButton.contains(p)
+				|| this.reEnergizeButton.contains(p);
+	}
+
+	private void onLoop() {
+		try {
+			Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+			if (localPlayer == null) return;
+			WorldPoint localTile = localPlayer.getWorldLocation();
+			if (localTile == null) return;
+			if (localTile.getPlane() == 1) {
+				this.climbdownStairs();
+				this.clickPortal();
+			}
+			if (this.hillScanEnabled && !this.hillScanActive) {
+				this.runTrackerScans();
+			}
+			this.onAction();
+
+			if (this.isDistracted() && !localPlayer.isInCombat() && this.isAtDesignatedArea(localPlayer)) {
+				this.handleDistraction();
+			}
+
+			if (this.shouldLookAround() && !localPlayer.isInCombat() && this.isAtDesignatedArea(localPlayer)) {
+				this.lookAround();
+			}
+
+			final long now = System.currentTimeMillis();
+			if (now >= forcedBreakUntilMs && now - lastForcedBreakMs >= MIN_BREAK_INTERVAL_MS) {
+				long sessionElapsed = now - sessionStartMs;
+				long forcedBreakMaxDeferMs = 30L * 60L * 1000L;
+				if (sessionElapsed >= MAX_SESSION_MS) {
+					if (this.AT_LOBBY.contains(localTile)) {
+						this.takeForcedBreak();
+						Global.sleep(Rs2Random.between(3000, 5000));
+						return;
+					} else {
+						this.forcedBreakPending = true;
+						this.status = "Forced break queued (waiting for lobby)";
+						if (sessionElapsed >= MAX_SESSION_MS + forcedBreakMaxDeferMs) {
+							this.takeForcedBreak();
+							Global.sleep(Rs2Random.between(3000, 5000));
+							return;
+						}
+					}
+				}
+			}
+			if (now >= this.nextAttackListReloadAtMs && !localPlayer.isInCombat() && !localPlayer.isMoving()) {
+				this.readMainUserFile();
+				this.loadList();
+				this.removeDuplicateNamesFromAllLists();
+				this.nextAttackListReloadAtMs = now + ATTACK_LIST_RELOAD_INTERVAL_MS;
+			}
+			this.trackRepeatAttackerAutoNsList(localPlayer, now);
+			this.maybeAutoSwitchLocation();
+			if (now >= this.nextActionTime) {
+				this.setNextPreventLogout();
+			}
+			if (now >= this.nextAntiBanAtMs && !localPlayer.isInCombat() && !this.AT_LOBBY.contains(localTile) && this.isAtDesignatedArea(localPlayer)) {
+				this.performAntiban();
+				long fatiguePenalty = (long) (this.getFatigueFactor(now - sessionStartMs) * 500L);
+				this.nextAntiBanAtMs = now + Rs2Random.between((int) ANTIBAN_MIN_INTERVAL_MS, (int) ANTIBAN_MAX_INTERVAL_MS) + fatiguePenalty;
+			}
+			this.checkHalfHourlyArrows();
+			if (!this.AT_LOBBY.contains(localTile)) {
+				this.avoidObstacles();
+			}
+			if ((this.currentArea == null || !this.currentArea.contains(localTile)) && !this.STUCK.contains(localTile)) {
+				this.handleOutOfArea(localPlayer);
+			} else if (this.STUCK.contains(localTile)) {
+				wasInFfaArea = false;
+				this.sleepWithFatigue(1000, 3000);
+				if (Rs2Random.between(0, 100) < 30) {
+					this.performAntiban();
+				}
+				this.clickPortal();
+			} else if (this.IN_FFA.contains(localTile)) {
+				wasInFfaArea = true;
+				this.handleInFFA(localPlayer);
+			}
+			aiAssistant.onTick();
+			if (now >= nextAutoRetaliateCheckMs && !autoRetaliateOffVerified) {
+				ensureAutoRetaliateOff();
+			}
+			dismissRandomEvents();
+			handleAttackerRetaliation(localPlayer);
+			if (now >= nextNonTargetScanMs) {
+				scanNonTargets(localPlayer);
+				nextNonTargetScanMs = now + 5000 + Rs2Random.between(0, 3000);
+			}
+			nonTargetTracker.tickSave();
+			if (playerStats.shouldPeriodicSave()) {
+				playerStats.save();
+			}
+			sessionTracker.tickSave();
+			int delay = (int) Math.max(100, Rs2Random.between(250, 500) * (1.0 - aiAssistant.getPlayerProfiles().size() * 0.001));
+			delay = Math.min(delay, 600);
+			this.sleepWithFatigue(delay, delay);
+		} catch (Exception ex) {
+			this.log("Error in onLoop: " + ex.getMessage());
+			java.io.StringWriter sw = new java.io.StringWriter();
+			java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+			ex.printStackTrace(pw);
+			pw.flush();
+			this.log(sw.toString());
+			Global.sleep(Rs2Random.between(1000, 2000));
+		}
+	}
+
+	private void initializeAreaMap() {
+		this.areaMap.put("Portal", new WorldArea(3322, 4761, 14, 6, 0));
+		this.areaMap.put("Middle", new WorldArea(3326, 4768, 7, 17, 0));
+		this.areaMap.put("Hills single", new WorldArea(3328, 4797, 5, 3, 0));
+		this.areaMap.put("Lava single", new WorldArea(3313, 4797, 6, 3, 0));
+		this.areaMap.put("Pond single", new WorldArea(3343, 4797, 9, 3, 0));
+		this.areaMap.put("Hills", new WorldArea(3325, 4813, 11, 8, 0));
+		this.areaMap.put("Pond", new WorldArea(3346, 4800, 7, 16, 0));
+		this.areaMap.put("Lava", new WorldArea(3313, 4800, 6, 16, 0));
+	}
+
+	private void handleAfkBreak() {
+		this.status = "Taking human-like AFK break";
+		long now = System.currentTimeMillis();
+		long runtime = now - this.fatigueStart;
+		double fatigueFactor = this.getFatigueFactor(runtime);
+		double fatigueMultiplier = 1.0 + fatigueFactor * 0.04;
+		long breakDuration = (long) (Rs2Random.between(30000, 220000) * fatigueMultiplier);
+		breakDuration = Math.min(breakDuration, 420000L);
+		this.log("Starting AFK break for " + (breakDuration / 1000L) + " seconds (fatigue: " + String.format("%.2f", fatigueFactor) + ")");
+		long breakEndTime = now + breakDuration;
+		while (System.currentTimeMillis() < breakEndTime) {
+			int sleepTime = Rs2Random.between(5000, 15000);
+			this.sleepWithFatigue(sleepTime, sleepTime + 2000);
+			if (Rs2Random.between(0, 100) < 3 + (int) (fatigueFactor * 0.2)) {
+				this.randomCameraRotation();
+			}
+			this.status = "AFK break: " + ((breakEndTime - System.currentTimeMillis()) / 1000L) + "s left";
+		}
+		double recoveryFactor = 0.5 + (fatigueFactor / 20.0) * 0.3;
+		this.fatigueStart += (long) (breakDuration * recoveryFactor);
+		this.energyBoost = Math.min(2.0, this.energyBoost + fatigueFactor * 0.025);
+		this.fatigueSpikeEndTime = 0L;
+		this.fatigueSpikeMagnitude = 0.0;
+		this.sessionFatiguePeak *= 0.7;
+		long nextBreakInMs = (long) (Rs2Random.between(900000, 3600000) / (1.0 + Math.min(fatigueFactor, 12.0) * 0.05));
+		this.nextAfkBreakTime = System.currentTimeMillis() + nextBreakInMs;
+		sendDiscordEmbed("AFK break finished. Next break at " + new java.util.Date(this.nextAfkBreakTime));
+		this.log("AFK break finished. Next break at " + new java.util.Date(this.nextAfkBreakTime));
+		this.status = "AFK break finished";
+	}
+
+	private void handleOutOfArea(Rs2PlayerModel localPlayer) {
+		WorldPoint tile = localPlayer.getWorldLocation();
+		if (this.currentArea == null) {
+			this.status = "No location selected";
+			if (this.AT_LOBBY.contains(tile)) {
+				if (this.forcedBreakPending) {
+					this.forcedBreakPending = false;
+					this.takeForcedBreak();
+				} else if (System.currentTimeMillis() >= this.nextAfkBreakTime) {
+					this.handleAfkBreak();
+				} else {
+					this.clickPortal();
+				}
+			}
+		} else if (this.AT_LOBBY.contains(tile)) {
+			if (wasInFfaArea && lastInCombatMs > 0) {
+				sessionTracker.recordDeath();
+				wasInFfaArea = false;
+				lastInCombatMs = 0L;
+			}
+			if (this.forcedBreakPending) {
+				this.forcedBreakPending = false;
+				this.takeForcedBreak();
+			} else if (System.currentTimeMillis() >= this.nextAfkBreakTime) {
+				this.handleAfkBreak();
+			} else {
+				this.clickPortal();
+			}
+		} else if (this.SAFE_ZONE.contains(tile)) {
+			if (lastInCombatMs > 0) {
+				sessionTracker.recordTargetRan();
+				lastInCombatMs = 0L;
+			}
+			this.gotoArea();
+		} else if (this.isFreeRoamEnabled()) {
+			if (!this.FREE_ROAM_AREA.contains(tile) && !this.FREE_ROAM_AREA_2.contains(tile)) {
+				this.waitBeforeWalkBack();
+				this.antiLure();
+			} else if (Rs2Random.between(0, 6) == 1 && !localPlayer.isInCombat()) {
+				this.waitBeforeWalkBack();
+				this.antiLure();
+			}
+		} else {
+			this.waitBeforeWalkBack();
+			this.antiLure();
+		}
+	}
+
+	private boolean isAtDesignatedArea(Rs2PlayerModel localPlayer) {
+		if (this.hillScanActive) return true;
+		if (this.currentArea == null) return true;
+		if (localPlayer == null) return true;
+		WorldPoint tile = localPlayer.getWorldLocation();
+		if (tile == null) return true;
+		return this.AT_LOBBY.contains(tile)
+				|| this.SAFE_ZONE.contains(tile)
+				|| this.STUCK.contains(tile)
+				|| this.currentArea.contains(tile);
+	}
+
+	private void handleInFFA(Rs2PlayerModel localPlayer) {
+		if (!localPlayer.isInCombat()) {
+			if (lastInCombatMs > 0 && System.currentTimeMillis() - lastInCombatMs > 3000) {
+				sessionTracker.recordCombatEnd();
+				if (Rs2Random.between(0, 100) < 25) {
+					this.postCombatGlance();
+				}
+			}
+		} else {
+			lastInCombatMs = System.currentTimeMillis();
+			lastCombatActivityMs = System.currentTimeMillis();
+		}
+		if (this.isAttackEnabled()) {
+			this.status = "Waiting";
+			if (!localPlayer.isInCombat()) {
+				final long now = System.currentTimeMillis();
+				final long sinceWalk = now - this.lastSelectedLocationWalkFinishedAtMs;
+				final boolean justArrived = sinceWalk >= 0L && sinceWalk <= POST_WALK_ATTACK_WINDOW_MS;
+				long fatigueR = System.currentTimeMillis() - fatigueStart;
+				double fatigueF = this.getFatigueFactor(fatigueR);
+				int scanDelay;
+				if (justArrived) {
+					scanDelay = Rs2Random.between(POST_WALK_ATTACK_SLEEP_MIN_MS, POST_WALK_ATTACK_SLEEP_MAX_MS);
+				} else {
+					scanDelay = (int) (Rs2Random.between(50, 250) * (1.0 + fatigueF * 0.05));
+				}
+				this.sleepWithFatigue(scanDelay, scanDelay + Rs2Random.between(20, 80));
+				if (!localPlayer.isInCombat()) {
+					sessionTracker.recordScan();
+					this.attackingPlayer();
+				}
+			}
+		} else {
+			if (!localPlayer.isInCombat() && Rs2Random.between(0, 100) < 2) {
+				this.idleGaze();
+			}
+			this.status = "Afking";
+		}
+		if (this.isPrayerOffEnabled() && !localPlayer.isInCombat()) {
+			this.turnPrayersOff();
+		}
+		if (!this.isQuickprayersEnabled() && this.isSwitchPrayersEnabled() && localPlayer.isInCombat()
+				&& !this.AT_LOBBY.contains(localPlayer.getWorldLocation())
+				&& !this.SAFE_ZONE.contains(localPlayer.getWorldLocation())
+				&& !this.STUCK.contains(localPlayer.getWorldLocation())) {
+			this.checkPrayers();
+		}
+		if (this.isProtectBluePhatsEnabled()
+				&& !this.AT_LOBBY.contains(localPlayer.getWorldLocation())
+				&& !this.SAFE_ZONE.contains(localPlayer.getWorldLocation())
+				&& !this.STUCK.contains(localPlayer.getWorldLocation())) {
+			Player attacker = findAttackerOfBluePhat(localPlayer);
+			if (attacker != null && !localPlayer.isInCombat()) {
+				this.status = "Protecting BluePhat from " + attacker.getName();
+				Rectangle clickbox = getActorClickbox(attacker);
+				if (clickbox != null) {
+					Point clickPoint = Rs2UiHelper.getClickingPoint(clickbox, true);
+					naturalMouseMovement(clickPoint.x, clickPoint.y);
+				}
+				this.sleepWithFatigue(50, 150);
+				if (rightClickInteract(attacker)) {
+					this.log("Attacking " + attacker.getName() + " (attacking a BluePhat)");
+					sendDiscordEmbed("Protecting BluePhat - attacking " + attacker.getName());
+				}
+			}
+		}
+		if (this.isReportEnabled() && this.currentArea != null && this.currentArea.contains(localPlayer.getWorldLocation())) {
+			this.handleReporting();
+		}
+		this.checkAttackStyleSwitch();
+	}
+
+	private void handleReporting() {
+		final long now = System.currentTimeMillis();
+		if (now < nextReportAttemptAtMs) {
+			return;
+		}
+		nextReportAttemptAtMs = now + Rs2Random.between(
+				(int) REPORT_ATTEMPT_MIN_INTERVAL_MS,
+				(int) REPORT_ATTEMPT_MAX_INTERVAL_MS
+		);
+		final Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		if (local == null || local.getWorldLocation() == null) {
+			return;
+		}
+		if (local.isInCombat() || local.isMoving()) {
+			return;
+		}
+		if (now >= nextReportListReloadAtMs) {
+			this.loadList();
+			nextReportListReloadAtMs = now + REPORT_LIST_RELOAD_MIN_INTERVAL_MS;
+		}
+		if (this.targets.isEmpty()) {
+			this.sleepWithFatigue(250, 600);
+			return;
+		}
+		final Rs2PlayerModel target = this.findReportTarget();
+		if (target == null || target.getName() == null || target.getWorldLocation() == null) {
+			this.sleepWithFatigue(250, 800);
+			return;
+		}
+		WorldPoint localLoc = local.getWorldLocation();
+		if (localLoc.distanceTo(target.getWorldLocation()) > MAX_TARGET_DISTANCE) {
+			this.status = "Report target too far";
+			this.sleepWithFatigue(250, 800);
+			return;
+		}
+		if (Rs2Widget.getWidget(REPORT_WIDGET_PARENT) != null) {
+			this.log("Report widget already open; skipping new report attempt.");
+			return;
+		}
+		this.status = "Attempting report";
+		this.log("Attempting to report: " + target.getName());
+		final boolean menuClicked = rightClickReport(target);
+		if (!menuClicked) {
+			this.log("Could not open report option for " + target.getName());
+			return;
+		}
+		this.sleepWithFatigue(120, 350);
+		final boolean appeared = Global.sleepUntil(
+				() -> Rs2Widget.getWidget(REPORT_WIDGET_PARENT) != null,
+				3000
+		);
+		if (!appeared) {
+			this.log("Report widget did not appear for " + target.getName());
+			return;
+		}
+		final Widget reasonParent = Rs2Widget.getWidget(REPORT_WIDGET_PARENT, REASON_PARENT_CHILD_INDEX);
+		if (reasonParent == null) {
+			this.log("Couldn't find report reason container (widget indices may have changed).");
+			return;
+		}
+		final Widget macroReason = reasonParent.getChild(MACRO_REASON_CHILD_INDEX);
+		if (macroReason == null) {
+			this.log("Couldn't find macro reason option (widget indices may have changed).");
+			return;
+		}
+		this.sleepWithFatigue(90, 220);
+		if (!clickWidget(macroReason)) {
+			this.log("Failed to select macro reason for " + target.getName());
+			return;
+		}
+		Global.sleepUntil(() -> Rs2Widget.getWidget(REPORT_WIDGET_PARENT) == null, 1500);
+		this.status = "Report submitted";
+		sessionTracker.recordReport();
+		this.log("Submitted report for " + target.getName() + ". Cooldown " + POST_REPORT_COOLDOWN_MS + "ms.");
+		sendDiscordEmbed("reported " + target.getName());
+		Global.sleep((int) POST_REPORT_COOLDOWN_MS);
+	}
+
+	private Rs2PlayerModel closestPlayer(Predicate<Rs2PlayerModel> predicate) {
+		final WorldPoint localLoc = getLocalPlayerLocation();
+		return Rs2Player.getPlayers(predicate).min(Comparator.comparingDouble(p -> {
+			WorldPoint loc = p.getWorldLocation();
+			if (loc == null || localLoc == null) return Double.MAX_VALUE;
+			return (double) loc.distanceTo(localLoc);
+		})).orElse(null);
+	}
+
+	private boolean isPlayerOnScreen(Rs2PlayerModel p) {
+		if (p == null || p.getWorldLocation() == null) return false;
+		Boolean visible = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			LocalPoint lp = LocalPoint.fromWorld(Microbot.getClient().getTopLevelWorldView(), p.getWorldLocation());
+			return lp != null && Rs2Camera.isTileOnScreen(lp);
+		}).orElse(Boolean.FALSE);
+		return visible != null && visible;
+	}
+
+	private Player findReportTarget() {
+		final Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		final String localName = local != null && local.getName() != null ? local.getName() : "";
+		final WorldPoint localLoc = local != null ? local.getWorldLocation() : null;
+
+		Rs2PlayerModel target = closestPlayer(p ->
+				p != null
+						&& p.getName() != null
+						&& !p.getName().equalsIgnoreCase(localName)
+						&& isPlayerOnScreen(p)
+						&& localLoc != null
+						&& p.getWorldLocation() != null
+						&& p.getWorldLocation().distanceTo(localLoc) <= MAX_TARGET_DISTANCE
+						&& this.IN_FFA.contains(p.getWorldLocation())
+						&& this.targets.contains(p.getName().toLowerCase(Locale.ROOT)));
+
+		if (target != null) {
+			this.ffaScanMisses = 0;
+		} else {
+			++this.ffaScanMisses;
+			if (this.ffaScanMisses >= MAX_FAILS) {
+				target = closestPlayer(p ->
+						p != null
+								&& p.getName() != null
+								&& !p.getName().equalsIgnoreCase(localName)
+								&& isPlayerOnScreen(p)
+								&& localLoc != null
+								&& p.getWorldLocation() != null
+								&& p.getWorldLocation().distanceTo(localLoc) <= MAX_TARGET_DISTANCE
+								&& this.targets.contains(p.getName().toLowerCase(Locale.ROOT)));
+
+				if (target != null) {
+					this.log("No FFA target after " + MAX_FAILS + " scans. Reporting outside FFA: " + target.getName());
+				}
+			}
+		}
+		return target;
+	}
+
+	private Rectangle getActorClickbox(Actor actor) {
+		if (actor == null) return null;
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> Rs2UiHelper.getActorClickbox(actor)).orElse(null);
+	}
+
+	private boolean rightClickReport(Player target) {
+		Rectangle clickbox = getActorClickbox(target);
+		if (clickbox == null) return false;
+		Point clickPoint = Rs2UiHelper.getClickingPoint(clickbox, true);
+		Microbot.getMouse().click(clickPoint, true);
+		Global.sleep(60, 160);
+		Boolean invoked = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			MenuEntry[] entries = Microbot.getClient().getMenuEntries();
+			for (MenuEntry entry : entries) {
+				if (entry.getOption() == null || !entry.getOption().equalsIgnoreCase("Report")) continue;
+				NewMenuEntry nme = new NewMenuEntry(entry.getOption(), entry.getTarget(),
+						entry.getIdentifier(), entry.getType(), entry.getParam0(), entry.getParam1(), false);
+				Microbot.doInvoke(nme, clickbox);
+				return true;
+			}
+			return false;
+		});
+		return invoked != null && invoked;
+	}
+
+	private boolean clickWidget(Widget widget) {
+		if (widget == null) return false;
+		Boolean clickable = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			if (widget.isHidden() || widget.getBounds() == null) return false;
+			Rectangle bounds = widget.getBounds();
+			if (bounds.width <= 0 || bounds.height <= 0) return false;
+			Microbot.getMouse().click(Rs2UiHelper.getClickingPoint(bounds, true));
+			return true;
+		});
+		return clickable != null && clickable;
+	}
 
 // ::continues::
