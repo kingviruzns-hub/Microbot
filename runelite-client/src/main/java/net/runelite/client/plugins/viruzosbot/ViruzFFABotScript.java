@@ -58,9 +58,10 @@ import java.util.stream.Collectors;
 
 import static java.nio.file.Paths.get;
 
-@Slf4j
 public class ViruzFFABotScript extends Script
 {
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
+	private static final String VERSION = "1.0.0";
 	private static final int REPORT_WIDGET_PARENT = 875;
 	private static final int REASON_PARENT_CHILD_INDEX = 19;
 	private static final int MACRO_REASON_CHILD_INDEX = 0;
