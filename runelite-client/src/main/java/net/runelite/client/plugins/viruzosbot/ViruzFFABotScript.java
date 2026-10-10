@@ -720,4 +720,28 @@ public class ViruzFFABotScript extends Script
 		sendDiscordEmbed("Removed from target-list for being fellow BluePhat - **" + safeName + "**");
 		log.info("BluePhat detected and handled: " + rawName);
 	}
+
+	static class Timer {
+		private long startMs;
+		Timer(long s) { this.startMs = s; }
+		Timer() { reset(); }
+		long elapsed() { return System.currentTimeMillis() - startMs; }
+		void reset() { startMs = System.currentTimeMillis(); }
+		String formatTime() {
+			long e = elapsed();
+			long h = e / 3600000L;
+			long m = (e % 3600000L) / 60000L;
+			long se = (e % 60000L) / 1000L;
+			return String.format("%02d:%02d:%02d", h, m, se);
+		}
+	}
+
+	private void log(String message) { log.info(message); }
+	private WorldPoint getLocalPlayerLocation() {
+		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		return local != null ? local.getWorldLocation() : null;
+	}
+	private void setCurrentThreshold(int val) { this.currentThreshold = val; }
+	private int getCurrentThreshold() { return this.currentThreshold; }
+
 // ::continues::
