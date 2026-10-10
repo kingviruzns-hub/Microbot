@@ -23,7 +23,6 @@ import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
-import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
@@ -75,6 +74,7 @@ import java.util.stream.Collectors;
 
 import static java.nio.file.Paths.get;
 
+@SuppressWarnings({"deprecation", "removal"})
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
@@ -1361,7 +1361,7 @@ public class ViruzFFABotScript extends Script
 		})).orElse(null);
 	}
 
-	private boolean isPlayerOnScreen(Rs2PlayerModel p) {
+	private boolean isPlayerOnScreen(Actor p) {
 		if (p == null || p.getWorldLocation() == null) return false;
 		Boolean visible = Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			LocalPoint lp = LocalPoint.fromWorld(Microbot.getClient().getTopLevelWorldView(), p.getWorldLocation());
@@ -1370,7 +1370,7 @@ public class ViruzFFABotScript extends Script
 		return visible != null && visible;
 	}
 
-	private Player findReportTarget() {
+	private Rs2PlayerModel findReportTarget() {
 		final Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		final String localName = local != null && local.getName() != null ? local.getName() : "";
 		final WorldPoint localLoc = local != null ? local.getWorldLocation() : null;
@@ -1430,7 +1430,7 @@ public class ViruzFFABotScript extends Script
 				return true;
 			}
 			return false;
-		});
+		}).orElse(false);
 		return invoked != null && invoked;
 	}
 
@@ -1442,7 +1442,7 @@ public class ViruzFFABotScript extends Script
 			if (bounds.width <= 0 || bounds.height <= 0) return false;
 			Microbot.getMouse().click(Rs2UiHelper.getClickingPoint(bounds, true));
 			return true;
-		});
+		}).orElse(false);
 		return clickable != null && clickable;
 	}
 
@@ -1592,7 +1592,7 @@ public class ViruzFFABotScript extends Script
 		Boolean visible = Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			MenuEntry[] entries = Microbot.getClient().getMenuEntries();
 			return Microbot.getClient().isMenuOpen() && entries != null && entries.length > 0;
-		});
+		}).orElse(false);
 		return visible != null && visible;
 	}
 
@@ -1613,7 +1613,7 @@ public class ViruzFFABotScript extends Script
 				return true;
 			}
 			return false;
-		});
+		}).orElse(false);
 		return clicked != null && clicked;
 	}
 
@@ -2758,11 +2758,11 @@ public class ViruzFFABotScript extends Script
 		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		WorldPoint localTile = local == null ? null : local.getWorldLocation();
 		if (localTile == null) return;
-		net.runelite.api.GameObject obj = Rs2GameObject.getGameObject(o -> o != null && o.getWorldLocation() != null
+		net.runelite.api.GameObject obj = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> o != null && o.getWorldLocation() != null
 				&& Math.hypot(o.getWorldLocation().getX() - localTile.getX(),
 				o.getWorldLocation().getY() - localTile.getY()) < 5);
 		if (obj != null) {
-			Rs2GameObject.interact(obj, "Examine");
+			net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(obj, "Examine");
 			this.sleepWithFatigue(300, 1000);
 		}
 	}
@@ -3380,14 +3380,14 @@ public class ViruzFFABotScript extends Script
 
 	private void examineGroundDecoration() {
 		this.status = "Examining ground";
-		net.runelite.api.GameObject deco = Rs2GameObject.getGameObject(o -> {
+		net.runelite.api.GameObject deco = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> {
 			if (o == null || o.getWorldLocation() == null) return false;
-			String n = Rs2GameObject.getCompositionName(o).orElse(null);
+			String n = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getCompositionName(o).orElse(null);
 			return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
 		}, 6);
 		if (deco == null) return;
-		if (Rs2GameObject.hasAction(deco, "Examine")) {
-			Rs2GameObject.interact(deco, "Examine");
+		if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(deco, "Examine")) {
+			net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(deco, "Examine");
 			Global.sleep(Rs2Random.between(400, 1100));
 		} else {
 			Point p = getClickablePointForObject(deco);
@@ -3447,12 +3447,12 @@ public class ViruzFFABotScript extends Script
 			this.log("Player is on an upper level (Z=1). Searching for climbable object...");
 			net.runelite.api.GameObject climbableObject = this.findClimbableObject();
 			if (climbableObject != null) {
-				String objName = Rs2GameObject.getCompositionName(climbableObject).orElse(null);
+				String objName = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getCompositionName(climbableObject).orElse(null);
 				this.log("Found climbable object: " + objName + " at " + climbableObject.getWorldLocation());
-				String climbOption = Rs2GameObject.hasAction(climbableObject, "Climb-down") ? "Climb-down" : this.getFallbackClimbOption(climbableObject);
+				String climbOption = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(climbableObject, "Climb-down") ? "Climb-down" : this.getFallbackClimbOption(climbableObject);
 				if (climbOption != null) {
 					this.log("Using action: " + climbOption + " on " + objName);
-					if (Rs2GameObject.interact(climbableObject, climbOption)) {
+					if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(climbableObject, climbOption)) {
 						Global.sleepUntil(() -> {
 							Rs2PlayerModel p = Rs2Player.getLocalPlayer();
 							WorldPoint w = p == null ? null : p.getWorldLocation();
@@ -3479,17 +3479,17 @@ public class ViruzFFABotScript extends Script
 	private net.runelite.api.GameObject findClimbableObject() {
 		String[] names = {"Stairs", "Ladder", "Staircase", "Spiral staircase", "Trapdoor"};
 		for (String name : names) {
-			net.runelite.api.GameObject obj = Rs2GameObject.getGameObject(name, true);
+			net.runelite.api.GameObject obj = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(name, true);
 			if (obj != null) {
 				return obj;
 			}
 		}
-		return Rs2GameObject.getGameObject(o -> Rs2GameObject.hasAction(o, "Climb-down"));
+		return net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-down"));
 	}
 
 	private String getFallbackClimbOption(net.runelite.api.GameObject gameObject) {
 		for (String action : new String[]{"Climb Down", "Climb", "Go-down"}) {
-			if (Rs2GameObject.hasAction(gameObject, action)) {
+			if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(gameObject, action)) {
 				return action;
 			}
 		}
@@ -3497,8 +3497,8 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void avoidObstacles() {
-		net.runelite.api.GameObject obstacle = Rs2GameObject.getGameObject(
-				o -> Rs2GameObject.hasAction(o, "Climb-up") || Rs2GameObject.hasAction(o, "Climb-down"), 8);
+		net.runelite.api.GameObject obstacle = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(
+				o -> net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-up") || net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-down"), 8);
 		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
 		if (obstacle == null || localPlayer == null) return;
 		WorldPoint lt = localPlayer.getWorldLocation();
@@ -3592,7 +3592,7 @@ public class ViruzFFABotScript extends Script
 			if (json.isBlank()) {
 				return;
 			}
-			com.google.gson.JsonElement root = com.google.gson.JsonParser.parseString(json);
+			com.google.gson.JsonElement root = new com.google.gson.JsonParser().parse(json);
 			boolean modified = false;
 
 			if (root.isJsonObject()) {
