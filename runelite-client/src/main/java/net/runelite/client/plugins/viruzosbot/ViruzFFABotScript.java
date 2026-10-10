@@ -3,17 +3,16 @@ package net.runelite.client.plugins.viruzosbot;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
-import net.runelite.api.Widget;
+import net.runelite.api.widgets.Widget;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
 import net.runelite.client.plugins.microbot.util.Global;
-import net.runelite.client.plugins.microbot.util.Rs2Random;
+import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
@@ -390,8 +389,9 @@ public class ViruzFFABotScript extends Script
 					return ChatEventType.CLAN_CHAT;
 				case FRIENDSCHAT:
 					return ChatEventType.CHAT_CHANNEL;
-				case PRIVATE_MESSAGE_IN:
-				case PRIVATE_MESSAGE_OUT:
+				case PRIVATECHAT:
+				case PRIVATECHATOUT:
+				case MODPRIVATECHAT:
 					return ChatEventType.PRIVATE_INFO;
 				default:
 					return ChatEventType.OTHER;
@@ -684,7 +684,7 @@ public class ViruzFFABotScript extends Script
 	private boolean isTargetWearingBluePartyhat(Player target) {
 		if (target == null) return false;
 		try {
-			Map<net.runelite.api.kit.KitType, Integer> equipped = Rs2Player.getPlayerEquipmentIds((Rs2PlayerModel) target);
+			Map<net.runelite.api.kit.KitType, Integer> equipped = Rs2Player.getPlayerEquipmentIds(new Rs2PlayerModel(target));
 			if (equipped == null) return false;
 			for (Map.Entry<net.runelite.api.kit.KitType, Integer> e : equipped.entrySet()) {
 				net.runelite.api.ItemComposition comp = Microbot.getClientThread().runOnClientThreadOptional(() ->
