@@ -61,6 +61,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -2757,10 +2758,9 @@ public class ViruzFFABotScript extends Script
 		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		WorldPoint localTile = local == null ? null : local.getWorldLocation();
 		if (localTile == null) return;
-		Rs2GameObject obj = Rs2GameObject.getAll(o -> o != null && o.getWorldLocation() != null
+		net.runelite.api.GameObject obj = Rs2GameObject.getGameObject(o -> o != null && o.getWorldLocation() != null
 				&& Math.hypot(o.getWorldLocation().getX() - localTile.getX(),
-				o.getWorldLocation().getY() - localTile.getY()) < 5)
-				.findFirst().orElse(null);
+				o.getWorldLocation().getY() - localTile.getY()) < 5);
 		if (obj != null) {
 			Rs2GameObject.interact(obj, "Examine");
 			this.sleepWithFatigue(300, 1000);
@@ -3221,4 +3221,1257 @@ public class ViruzFFABotScript extends Script
 		return Math.max(0.0, Math.min(20.0, fatigue));
 	}
 
-// ::continues::
+	private void pseudoAfk() {
+		this.status = "Looking away";
+		this.log(this.status);
+		Microbot.naturalMouse.moveOffScreen();
+		this.sleepWithFatigue(3000, 8000);
+		if (Rs2Random.between(0, 100) < 30) {
+			rotateCameraTo(getCameraYawDegrees() + Rs2Random.between(-25, 25), Rs2Camera.getPitch() + Rs2Random.between(-15, 15));
+		}
+	}
+
+	private void stretchMicrobreak() {
+		this.status = "Micro break";
+		this.log(this.status);
+		Microbot.naturalMouse.moveOffScreen();
+		this.sleepWithFatigue(4000, 10000);
+		if (Rs2Random.between(0, 100) < 20) {
+			this.randomCameraRotation();
+		}
+	}
+
+	private void doubleTabCycle() {
+		this.status = "Flicking through tabs";
+		InterfaceTab[] order = {
+				InterfaceTab.INVENTORY, InterfaceTab.PRAYER, InterfaceTab.MAGIC, InterfaceTab.COMBAT,
+				InterfaceTab.EQUIPMENT, InterfaceTab.SKILLS, InterfaceTab.QUESTS, InterfaceTab.FRIENDS,
+				InterfaceTab.CHAT, InterfaceTab.SETTINGS, InterfaceTab.MUSIC, InterfaceTab.LOGOUT
+		};
+		int startIdx = Rs2Random.between(0, order.length - 2);
+		InterfaceTab open = Rs2Tab.getCurrentTab();
+		if (open != null) {
+			InterfaceTab first = order[startIdx];
+			if (first != open) {
+				Rs2Tab.switchTo(first);
+				this.sleepWithFatigue(150, 450);
+			}
+			InterfaceTab second = order[startIdx + 1];
+			if (second != first) {
+				Rs2Tab.switchTo(second);
+				this.sleepWithFatigue(200, 500);
+			}
+			Rs2Tab.switchTo(open);
+			this.sleepWithFatigue(200, 600);
+		}
+	}
+
+	private void rightClickDrag() {
+		this.status = "Right-click dragging";
+		int startX = Rs2Random.between(200, 500);
+		int startY = Rs2Random.between(150, 350);
+		int endX = startX + ThreadLocalRandom.current().nextInt(-35, 36);
+		int endY = startY + ThreadLocalRandom.current().nextInt(-35, 36);
+		naturalMouseMovement(startX, startY);
+		Global.sleep(Rs2Random.between(100, 300));
+		Point pos = Microbot.getMouse().getMousePosition();
+		if (pos != null) {
+			Microbot.getMouse().click(new net.runelite.api.Point(pos.x, pos.y), true);
+			this.sleepWithFatigue(80, 200);
+			naturalMouseMovement(endX, endY);
+			Global.sleep(Rs2Random.between(60, 180));
+			Microbot.getMouse().click();
+		}
+		this.sleepWithFatigue(100, 300);
+	}
+
+	private void mouseScrollWheel() {
+		this.status = "Scrolling";
+		int scrolls = Rs2Random.between(1, 5);
+		int sX = Rs2Random.between(520, 740);
+		int sY = Rs2Random.between(5, 100);
+		naturalMouseMovement(sX, sY);
+		Global.sleep(Rs2Random.between(150, 400));
+		for (int i = 0; i < scrolls; i++) {
+			int scrollX = sX + Rs2Random.between(-2, 2);
+			int scrollY = sY + i * 8 + Rs2Random.between(-2, 2);
+			Microbot.getMouse().move(new net.runelite.api.Point(scrollX, scrollY));
+			Global.sleep(Rs2Random.between(100, 300));
+		}
+		Global.sleep(Rs2Random.between(200, 500));
+	}
+
+	private void rightClickMenuHover() {
+		this.status = "Hovering right-click menu";
+		int x = Rs2Random.between(200, 500);
+		int y = Rs2Random.between(150, 350);
+		int clickX = x + Rs2Random.between(-5, 5);
+		int clickY = y + Rs2Random.between(-5, 5);
+		naturalMouseMovement(clickX, clickY);
+		Microbot.getMouse().click(new net.runelite.api.Point(clickX, clickY), true);
+		Global.sleep(Rs2Random.between(100, 300));
+		int hoverX = x + Rs2Random.between(-30, 30);
+		int hoverY = y + Rs2Random.between(-80, -20);
+		naturalMouseMovement(hoverX, hoverY);
+		Global.sleep(Rs2Random.between(300, 800));
+		Microbot.getMouse().click(new net.runelite.api.Point(x + 50, y + 50), false);
+	}
+
+	private void openWorldMap() {
+		this.status = "Checking world map";
+		Rectangle mmBounds = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			Widget mm = net.runelite.client.plugins.microbot.util.walker.Rs2MiniMap.getMinimapDrawWidget();
+			return mm == null ? null : mm.getBounds();
+		}).orElse(null);
+		if (mmBounds == null) {
+			mmBounds = new Rectangle(600, 20, 120, 120);
+		}
+		naturalMouseMovement(mmBounds.x + mmBounds.width / 2, mmBounds.y + mmBounds.height / 2);
+		Global.sleep(Rs2Random.between(400, 1200));
+		if (Rs2Random.between(0, 100) < 30) {
+			Microbot.getMouse().click();
+			Global.sleep(Rs2Random.between(200, 600));
+		}
+	}
+
+	private void chatboxClick() {
+		this.status = "Clicking chatbox";
+		int chatX = Rs2Random.between(20, 500);
+		int chatY = Rs2Random.between(440, 480);
+		naturalMouseMovement(chatX, chatY);
+		Global.sleep(Rs2Random.between(200, 600));
+		if (Rs2Random.between(0, 100) < 30) {
+			Microbot.getMouse().click(new net.runelite.api.Point(chatX, chatY), false);
+			Global.sleep(Rs2Random.between(100, 300));
+			Microbot.getMouse().click(new net.runelite.api.Point(chatX + 50, chatY), false);
+		}
+	}
+
+	private void walkAdjust() {
+		this.status = "Adjusting position";
+		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		if (local == null) return;
+		WorldPoint current = local.getWorldLocation();
+		if (current == null) return;
+		int dx = Rs2Random.between(-2, 2);
+		int dy = Rs2Random.between(-2, 2);
+		if (dx == 0 && dy == 0) dx = 1;
+		WorldPoint target = current.dx(dx).dy(dy);
+		long fatigueR = System.currentTimeMillis() - fatigueStart;
+		double fatigueF = this.getFatigueFactor(fatigueR);
+		humanWalk(target, fatigueF * 0.3);
+		Global.sleep(Rs2Random.between(600, 1500));
+		if (Rs2Random.between(0, 100) < 50) {
+			humanWalk(current, fatigueF * 0.2);
+			Global.sleep(Rs2Random.between(500, 1200));
+		}
+	}
+
+	private void hoverSelf() {
+		this.status = "Hovering over self";
+		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		if (local == null) return;
+		Point p = getClickablePoint(local);
+		if (p != null) {
+			naturalMouseMovement(p.x, p.y);
+		}
+		Global.sleep(Rs2Random.between(300, 900));
+	}
+
+	private void examineGroundDecoration() {
+		this.status = "Examining ground";
+		net.runelite.api.GameObject deco = Rs2GameObject.getGameObject(o -> {
+			if (o == null || o.getWorldLocation() == null) return false;
+			String n = Rs2GameObject.getCompositionName(o).orElse(null);
+			return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
+		}, 6);
+		if (deco == null) return;
+		if (Rs2GameObject.hasAction(deco, "Examine")) {
+			Rs2GameObject.interact(deco, "Examine");
+			Global.sleep(Rs2Random.between(400, 1100));
+		} else {
+			Point p = getClickablePointForObject(deco);
+			if (p != null) {
+				naturalMouseMovement(p.x, p.y);
+			}
+			Global.sleep(Rs2Random.between(300, 800));
+		}
+	}
+
+	private void checkSpellbook() {
+		this.status = "Checking spellbook";
+		if (Rs2Tab.switchTo(InterfaceTab.MAGIC)) {
+			Global.sleep(Rs2Random.between(500, 1300));
+			int spX = Rs2Random.between(100, 600);
+			int spY = Rs2Random.between(100, 350);
+			naturalMouseMovement(spX, spY);
+			Global.sleep(Rs2Random.between(400, 1000));
+			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+		}
+	}
+
+	private void mousePatternMove() {
+		this.status = "Moving mouse in pattern";
+		Point start = Microbot.getMouse().getMousePosition();
+		if (start == null) return;
+		for (int i = 0; i < Rs2Random.between(2, 5); i++) {
+			int dx = Rs2Random.between(-80, 80);
+			int dy = Rs2Random.between(-60, 60);
+			int targetX = Math.max(0, Math.min(765, start.x + dx));
+			int targetY = Math.max(0, Math.min(503, start.y + dy));
+			naturalMouseMovement(targetX, targetY);
+			Global.sleep(Rs2Random.between(100, 350));
+			start = Microbot.getMouse().getMousePosition();
+			if (start == null) return;
+		}
+	}
+
+	private void friendsChatHover() {
+		this.status = "Checking friends chat";
+		if (Rs2Tab.switchTo(InterfaceTab.CHAT)) {
+			Global.sleep(Rs2Random.between(500, 1200));
+			int fX = Rs2Random.between(100, 500);
+			int fY = Rs2Random.between(100, 300);
+			naturalMouseMovement(fX, fY);
+			Global.sleep(Rs2Random.between(400, 1000));
+			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+		}
+	}
+
+	private void climbdownStairs() {
+		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+		if (localPlayer == null) return;
+		WorldPoint loc = localPlayer.getWorldLocation();
+		if (loc == null) return;
+		if (loc.getPlane() == 1) {
+			this.log("Player is on an upper level (Z=1). Searching for climbable object...");
+			net.runelite.api.GameObject climbableObject = this.findClimbableObject();
+			if (climbableObject != null) {
+				String objName = Rs2GameObject.getCompositionName(climbableObject).orElse(null);
+				this.log("Found climbable object: " + objName + " at " + climbableObject.getWorldLocation());
+				String climbOption = Rs2GameObject.hasAction(climbableObject, "Climb-down") ? "Climb-down" : this.getFallbackClimbOption(climbableObject);
+				if (climbOption != null) {
+					this.log("Using action: " + climbOption + " on " + objName);
+					if (Rs2GameObject.interact(climbableObject, climbOption)) {
+						Global.sleepUntil(() -> {
+							Rs2PlayerModel p = Rs2Player.getLocalPlayer();
+							WorldPoint w = p == null ? null : p.getWorldLocation();
+							return w != null && w.getPlane() == 0;
+						}, 5000);
+					}
+					localPlayer = Rs2Player.getLocalPlayer();
+					WorldPoint w2 = localPlayer == null ? null : localPlayer.getWorldLocation();
+					if (w2 != null && w2.getPlane() == 0) {
+						this.log("Successfully climbed down. Returning to combat area");
+						this.gotoArea();
+					} else {
+						this.log("Failed to climb down.");
+					}
+				} else {
+					this.log("No valid climb option found for " + objName);
+				}
+			} else {
+				this.log("No climbable objects found on Z=1.");
+			}
+		}
+	}
+
+	private net.runelite.api.GameObject findClimbableObject() {
+		String[] names = {"Stairs", "Ladder", "Staircase", "Spiral staircase", "Trapdoor"};
+		for (String name : names) {
+			net.runelite.api.GameObject obj = Rs2GameObject.getGameObject(name, true);
+			if (obj != null) {
+				return obj;
+			}
+		}
+		return Rs2GameObject.getGameObject(o -> Rs2GameObject.hasAction(o, "Climb-down"));
+	}
+
+	private String getFallbackClimbOption(net.runelite.api.GameObject gameObject) {
+		for (String action : new String[]{"Climb Down", "Climb", "Go-down"}) {
+			if (Rs2GameObject.hasAction(gameObject, action)) {
+				return action;
+			}
+		}
+		return null;
+	}
+
+	private void avoidObstacles() {
+		net.runelite.api.GameObject obstacle = Rs2GameObject.getGameObject(
+				o -> Rs2GameObject.hasAction(o, "Climb-up") || Rs2GameObject.hasAction(o, "Climb-down"), 8);
+		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+		if (obstacle == null || localPlayer == null) return;
+		WorldPoint lt = localPlayer.getWorldLocation();
+		WorldPoint ot = obstacle.getWorldLocation();
+		if (lt != null && ot != null && lt.distanceTo(ot) < 8) {
+			this.log("Avoiding climbing obstacle");
+			Rs2Walker.walkTo(lt.dx(Rs2Random.between(-2, 2)).dy(Rs2Random.between(-2, 2)));
+			Global.sleep(Rs2Random.between(2000, 3000));
+		}
+	}
+
+	private void scanNonTargets(Rs2PlayerModel localPlayer) {
+		if (localPlayer == null || localPlayer.getName() == null) return;
+		String localName = localPlayer.getName().toLowerCase(Locale.ROOT).trim();
+		String location = getLocationContext(localPlayer);
+		List<Rs2PlayerModel> allPlayers = Rs2Player.getPlayers(p -> p != null && p.getName() != null)
+				.collect(Collectors.toList());
+		for (Rs2PlayerModel p : allPlayers) {
+			String name = p.getName().toLowerCase(Locale.ROOT).trim();
+			if (name.equals(localName)) continue;
+			nonTargetTracker.record(p, location);
+		}
+	}
+
+	private String getLocationContext(Rs2PlayerModel localPlayer) {
+		if (localPlayer == null) return "Unknown";
+		WorldPoint tile = localPlayer.getWorldLocation();
+		if (tile == null) return "Unknown";
+		if (AT_LOBBY.contains(tile)) return "Lobby";
+		if (SAFE_ZONE.contains(tile)) return "Safe zone";
+		if (STUCK.contains(tile)) return "Stuck";
+		if (IN_FFA.contains(tile)) {
+			String areaName = "";
+			for (Map.Entry<String, WorldArea> entry : areaMap.entrySet()) {
+				if (entry.getValue().contains(tile)) {
+					areaName = entry.getKey();
+					break;
+				}
+			}
+			if (!areaName.isEmpty()) return "FFA - " + areaName;
+			return "FFA";
+		}
+		return "Unknown";
+	}
+
+	private List<String> readLines(Path path) throws IOException {
+		try {
+			return Files.readAllLines(path, StandardCharsets.UTF_8);
+		} catch (java.nio.charset.MalformedInputException e) {
+			this.log("Malformed UTF-8 input, trying ISO_8859_1");
+			return Files.readAllLines(path, StandardCharsets.ISO_8859_1);
+		}
+	}
+
+	private void removeDuplicateNames(String filePath) {
+		try {
+			Path fileLocation = get(filePath);
+			if (!Files.exists(fileLocation)) {
+				return;
+			}
+			if (filePath.toLowerCase(Locale.ROOT).endsWith(".json")) {
+				removeDuplicateJsonNames(fileLocation);
+				return;
+			}
+			List<String> lines = readLines(fileLocation);
+			Set<String> uniqueLines = new LinkedHashSet<>();
+			boolean modified = false;
+
+			for (String line : lines) {
+				String trimmed = line.trim();
+				if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
+					if (!uniqueLines.add(trimmed.toLowerCase())) {
+						modified = true;
+						this.log("Removing duplicate name: " + trimmed);
+					}
+				}
+			}
+
+			if (modified) {
+				Files.write(fileLocation, uniqueLines, StandardCharsets.UTF_8);
+				this.log(fileLocation.getFileName() + " updated: removed duplicates.");
+			}
+		} catch (Exception e) {
+			this.log("Error in removeDuplicateNames: " + e);
+		}
+	}
+
+	private void removeDuplicateJsonNames(Path fileLocation) {
+		try {
+			String json = Files.readString(fileLocation, StandardCharsets.UTF_8);
+			if (json.isBlank()) {
+				return;
+			}
+			com.google.gson.JsonElement root = com.google.gson.JsonParser.parseString(json);
+			boolean modified = false;
+
+			if (root.isJsonObject()) {
+				com.google.gson.JsonObject obj = root.getAsJsonObject();
+				for (String mapKey : new String[]{"profiles", "patterns"}) {
+					if (obj.has(mapKey) && obj.get(mapKey).isJsonObject()) {
+						com.google.gson.JsonObject map = obj.getAsJsonObject(mapKey);
+						com.google.gson.JsonObject deduped = new com.google.gson.JsonObject();
+						java.util.LinkedHashMap<String, com.google.gson.JsonElement> byLower = new java.util.LinkedHashMap<>();
+						for (Map.Entry<String, com.google.gson.JsonElement> e : map.entrySet()) {
+							String lower = e.getKey().toLowerCase(Locale.ROOT).trim();
+							if (byLower.containsKey(lower)) {
+								modified = true;
+								this.log("Removing duplicate name in " + fileLocation.getFileName() + ": " + e.getKey());
+							} else {
+								byLower.put(lower, e.getValue());
+							}
+						}
+						for (Map.Entry<String, com.google.gson.JsonElement> e : byLower.entrySet()) {
+							deduped.add(e.getKey(), e.getValue());
+						}
+						obj.add(mapKey, deduped);
+					}
+				}
+				if (obj.has("encounters") && obj.get("encounters").isJsonArray()) {
+					com.google.gson.JsonArray arr = obj.getAsJsonArray("encounters");
+					com.google.gson.JsonArray deduped = new com.google.gson.JsonArray();
+					java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+					for (com.google.gson.JsonElement el : arr) {
+						String tname = null;
+						if (el.isJsonObject() && el.getAsJsonObject().has("targetName")) {
+							com.google.gson.JsonElement t = el.getAsJsonObject().get("targetName");
+							if (t.isJsonPrimitive() && t.getAsJsonPrimitive().isString()) {
+								tname = t.getAsString().toLowerCase(Locale.ROOT).trim();
+							}
+						}
+						if (tname != null && !tname.isEmpty()) {
+							if (!seen.add(tname)) {
+								modified = true;
+								this.log("Removing duplicate encounter in " + fileLocation.getFileName() + ": " + tname);
+								continue;
+							}
+						}
+						deduped.add(el);
+					}
+					obj.add("encounters", deduped);
+				}
+				root = obj;
+			} else if (root.isJsonArray()) {
+				com.google.gson.JsonArray arr = root.getAsJsonArray();
+				com.google.gson.JsonArray deduped = new com.google.gson.JsonArray();
+				java.util.LinkedHashMap<String, com.google.gson.JsonElement> byLower = new java.util.LinkedHashMap<>();
+				for (com.google.gson.JsonElement el : arr) {
+					String key = "";
+					if (el.isJsonPrimitive() && el.getAsJsonPrimitive().isString()) {
+						key = el.getAsString().toLowerCase(Locale.ROOT).trim();
+					} else if (el.isJsonObject() && el.getAsJsonObject().has("playerName")) {
+						com.google.gson.JsonElement pn = el.getAsJsonObject().get("playerName");
+						if (pn.isJsonPrimitive() && pn.getAsJsonPrimitive().isString()) {
+							key = pn.getAsString().toLowerCase(Locale.ROOT).trim();
+						}
+					}
+					if (key.isEmpty()) {
+						deduped.add(el);
+						continue;
+					}
+					com.google.gson.JsonElement existing = byLower.get(key);
+					if (existing == null) {
+						byLower.put(key, el);
+					} else {
+						modified = true;
+						this.log("Removing duplicate name in " + fileLocation.getFileName() + ": " + key);
+						boolean keepNewer = el.isJsonObject() && existing.isJsonObject()
+								&& el.getAsJsonObject().has("lastSeenMs") && existing.getAsJsonObject().has("lastSeenMs")
+								&& el.getAsJsonObject().get("lastSeenMs").getAsLong() > existing.getAsJsonObject().get("lastSeenMs").getAsLong();
+						if (keepNewer) {
+							byLower.put(key, el);
+						}
+					}
+				}
+				for (com.google.gson.JsonElement el : byLower.values()) {
+					deduped.add(el);
+				}
+				if (deduped.size() != arr.size()) {
+					modified = true;
+				}
+				root = deduped;
+			}
+
+			if (modified) {
+				Files.writeString(fileLocation,
+						new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(root),
+						StandardCharsets.UTF_8);
+				this.log(fileLocation.getFileName() + " updated: removed duplicates.");
+			}
+		} catch (Exception e) {
+			this.log("Error in removeDuplicateJsonNames for " + fileLocation.getFileName() + ": " + e);
+		}
+	}
+
+	private void removeDuplicateNamesFromAllLists() {
+		removeDuplicateNames(this.filePath);
+		removeDuplicateNames(Config.getLureDragFilePath());
+		removeDuplicateNames(Config.getBluePhatsFilePath());
+		removeDuplicateNames(Config.getAiDataFilePath());
+		removeDuplicateNames(Config.getLastSeenFilePath());
+	}
+
+	private void removeBlockedNamesFromFile(String filePath) {
+		try {
+			Path fileLocation = get(filePath);
+			if (!Files.exists(fileLocation)) {
+				return;
+			}
+			List<String> lines = readLines(fileLocation);
+			Set<String> uniqueLines = new LinkedHashSet<>();
+			boolean modified = false;
+
+			for (String line : lines) {
+				String trimmed = line.trim();
+				String lowerLine = trimmed.toLowerCase();
+				boolean isBlocked = false;
+
+				for (String blockedName : this.BLOCKED_NAMES) {
+					if (lowerLine.equals(blockedName.toLowerCase())) {
+						isBlocked = true;
+						break;
+					}
+				}
+
+				if (isBlocked) {
+					modified = true;
+					this.log("Removing blocked name from file: " + trimmed);
+				} else if (!trimmed.isEmpty()) {
+					if (!uniqueLines.add(line)) {
+						modified = true;
+					}
+				}
+			}
+
+			if (modified) {
+				Files.write(fileLocation, uniqueLines, StandardCharsets.UTF_8);
+				this.log("nslist.txt updated: removed blocked names and/or duplicates.");
+			}
+		} catch (Exception e) {
+			this.log("Error in removeBlockedNamesFromFile: " + e);
+		}
+	}
+
+	private void loadList() {
+		Path path = get(this.filePath);
+		if (!Files.exists(path)) {
+			this.log("File not found: " + this.filePath);
+		} else {
+			try {
+				removeBlockedNamesFromFile(this.filePath);
+				removeDuplicateNames(this.filePath);
+				List<String> lines = readLines(path);
+
+				Set<String> trimmed = lines.stream()
+						.map(String::trim)
+						.filter(s -> !s.isEmpty() && !s.startsWith("#"))
+						.map(String::toLowerCase)
+						.collect(Collectors.toSet());
+
+				this.targets.clear();
+				this.targets.addAll(trimmed);
+				this.log("Successfully loaded " + this.attackSet.size() + " names from nslist.txt.");
+			} catch (IOException e) {
+				this.log("Error reading file: " + e.getMessage());
+			}
+		}
+	}
+
+	private void readMainUserFile() {
+		this.attackSet.clear();
+
+		Path path = get(this.filePath);
+		if (!Files.exists(path)) {
+			return;
+		}
+
+		try {
+			removeBlockedNamesFromFile(this.filePath);
+			List<String> lines = readLines(path);
+
+			this.attackSet = lines.stream()
+					.map(String::trim)
+					.filter((name) -> !name.isEmpty())
+					.map(String::toLowerCase)
+					.collect(Collectors.toSet());
+		} catch (IOException var7) {
+			this.log("Error reading main user file: " + var7.getMessage());
+		}
+	}
+
+	private static final long WEEK_MS = 7L * 24 * 60 * 60 * 1000;
+
+	private void purgeInactiveProfiles() {
+		Map<String, AIAssistant.PlayerProfile> profiles = aiAssistant.getPlayerProfiles();
+		if (profiles.isEmpty()) {
+			this.log("Purge List: no profiles to purge");
+			return;
+		}
+
+		int quitCount = 0;
+		int activeCount = 0;
+		final long now = System.currentTimeMillis();
+		for (Map.Entry<String, AIAssistant.PlayerProfile> e : profiles.entrySet()) {
+			String name = e.getKey();
+			if (name == null || name.isEmpty()) continue;
+			AIAssistant.PlayerProfile profile = e.getValue();
+			long lastSeenMs = profile.lastSeenAt;
+			if (lastSeenMs <= 0) continue;
+			if (now - lastSeenMs > WEEK_MS) {
+				aiAssistant.removeProfile(name);
+				nonTargetTracker.markAsQuit(name, lastSeenMs);
+				this.log("Purge List: removed " + name + " from ai_data.json (quit, last seen "
+						+ java.time.Instant.ofEpochMilli(lastSeenMs)
+						.atZone(java.time.ZoneId.systemDefault())
+						.toLocalDate()
+						+ ")");
+				quitCount++;
+			} else {
+				aiAssistant.clearQuitStatus(name);
+				nonTargetTracker.clearQuitStatus(name);
+				activeCount++;
+			}
+		}
+		this.log("Purge List: marked " + quitCount + " inactive profile(s) as quit, cleared quit flag for " + activeCount + " active profile(s)");
+	}
+
+	private void reEnergize() {
+		long now = System.currentTimeMillis();
+		long runtime = now - fatigueStart;
+		long reduction = (long) (runtime * 0.25);
+		fatigueStart += reduction;
+		this.status = "ReEnergized! Fatigue reduced";
+		this.log("ReEnergize: fatigue reduced by ~25%");
+	}
+
+	private void checkEquipmentTab() {
+		if (!Rs2Tab.switchTo(InterfaceTab.EQUIPMENT)) return;
+		this.sleepWithFatigue(300, 800);
+		Rs2ItemModel weapon = Rs2Equipment.get(EquipmentInventorySlot.WEAPON);
+		if (weapon != null) {
+			Point p = getInventoryItemClickPoint(weapon);
+			if (p != null) {
+				naturalMouseMovement(p.x, p.y);
+			}
+			this.sleepWithFatigue(500, 1500);
+		}
+		this.status = "Checking equipment";
+		this.log(this.status);
+		if (Rs2Random.between(0, 100) < 30) {
+			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+		}
+	}
+
+	private void inventoryHover() {
+		if (!Rs2Tab.isCurrentTab(InterfaceTab.INVENTORY)) {
+			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+		}
+		this.sleepWithFatigue(200, 500);
+		Rs2ItemModel item = Rs2Inventory.items().filter(i -> i != null && i.getName() != null).findFirst().orElse(null);
+		if (item != null) {
+			Point p = getInventoryItemClickPoint(item);
+			if (p != null) {
+				naturalMouseMovement(p.x, p.y);
+			}
+			this.sleepWithFatigue(200, 700);
+			this.status = "Browsing inventory";
+		}
+	}
+
+	private void emoteTabHover() {
+		if (!Rs2Tab.switchTo(InterfaceTab.EMOTES)) return;
+		this.sleepWithFatigue(400, 1000);
+		this.status = "Browsing emotes";
+		this.log(this.status);
+		this.sleepWithFatigue(600, 1500);
+		Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+	}
+
+	private void takeForcedBreak() {
+		this.forcedBreakPending = false;
+		long runtime = System.currentTimeMillis() - this.fatigueStart;
+		double fatigueFactor = this.getFatigueFactor(runtime);
+		double fatigueMult = 1.0 + fatigueFactor * 0.05;
+		long breakDuration = (long) (Rs2Random.between((int) FORCED_BREAK_MIN_MS, (int) FORCED_BREAK_MAX_MS) * fatigueMult);
+		breakDuration = Math.min(breakDuration, 900000L);
+		this.status = "Taking a break";
+		this.log("Starting forced break for " + (breakDuration / 1000L) + " seconds (fatigue: " + String.format("%.2f", fatigueFactor) + ")");
+		sendDiscordEmbed("Forced " + (breakDuration / 1000L / 60L) + "min break ~ ");
+		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		WorldPoint localTile = local == null ? null : local.getWorldLocation();
+		if (Rs2Random.between(0, 100) < 30 && localTile != null && this.AT_LOBBY.contains(localTile)) {
+			Rs2Player.logout();
+		}
+		long breakEnd = System.currentTimeMillis() + breakDuration;
+		while (System.currentTimeMillis() < breakEnd) {
+			int sleepTime = Rs2Random.between(5000, 15000);
+			this.sleepWithFatigue(sleepTime, sleepTime + 2000);
+			if (Rs2Random.between(0, 100) < 3 + (int) (fatigueFactor * 0.2)) {
+				this.randomCameraRotation();
+			}
+			this.status = "Forced break: " + ((breakEnd - System.currentTimeMillis()) / 1000L) + "s left";
+		}
+		double recoveryFactor = 0.6 + (fatigueFactor / 20.0) * 0.2;
+		this.fatigueStart += (long) (breakDuration * recoveryFactor);
+		this.energyBoost = Math.min(2.5, this.energyBoost + fatigueFactor * 0.0375);
+		this.fatigueSpikeEndTime = 0L;
+		this.fatigueSpikeMagnitude = 0.0;
+		this.sessionFatiguePeak *= 0.5;
+		this.forcedBreakUntilMs = System.currentTimeMillis() + Rs2Random.between(30000, 120000);
+		this.lastForcedBreakMs = System.currentTimeMillis();
+		this.sessionStartMs = System.currentTimeMillis();
+		this.actionsSinceBreak = 0;
+		if (Microbot.isLoggedIn()) {
+			this.status = "Break over, returning";
+			this.log("Forced break finished, resuming");
+		} else {
+			this.log("Break over, logging back in");
+		}
+	}
+
+	private Point getInventoryItemClickPoint(Rs2ItemModel item) {
+		if (item == null) return null;
+		Rectangle b = Rs2Inventory.itemBounds(item);
+		if (b == null) return null;
+		return new Point(b.x + b.width / 2, b.y + b.height / 2);
+	}
+
+	private Point getClickablePointForObject(net.runelite.api.TileObject obj) {
+		if (obj == null) return null;
+		java.awt.Shape poly = Microbot.getClientThread().runOnClientThreadOptional(obj::getCanvasTilePoly).orElse(null);
+		if (poly == null) return null;
+		Rectangle b = poly.getBounds();
+		return new Point(b.x + b.width / 2, b.y + b.height / 2);
+	}
+
+	private void ensureAutoRetaliateOff() {
+		if (autoRetaliateOffVerified) return;
+		try {
+			if (Rs2Tab.switchTo(InterfaceTab.COMBAT)) {
+				Global.sleep(Rs2Random.between(300, 800));
+				for (int childIdx : AUTO_RETALIATE_CANDIDATE_CHILDS) {
+					Widget w = Rs2Widget.getWidget(COMBAT_WIDGET_PARENT);
+					if (w == null) continue;
+					Widget wc = w.getChild(childIdx);
+					if (wc != null && !wc.isHidden()) {
+						String[] actions = wc.getActions();
+						if (actions != null) {
+							for (String action : actions) {
+								if (action != null && action.toLowerCase(Locale.ROOT).contains("auto")) {
+									Rs2Widget.clickWidget(wc);
+									Global.sleep(Rs2Random.between(200, 500));
+									autoRetaliateOffVerified = true;
+									this.log("Auto-retaliate toggled off via widget " + childIdx);
+									return;
+								}
+							}
+						}
+					}
+				}
+				Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+			}
+		} catch (Exception e) {
+			this.log("Could not toggle auto-retaliate: " + e.getMessage());
+		} finally {
+			nextAutoRetaliateCheckMs = System.currentTimeMillis() + AUTO_RETALIATE_CHECK_INTERVAL_MS;
+		}
+	}
+
+	private void dismissRandomEvents() {
+		long now = System.currentTimeMillis();
+		if (now < nextRandomEventCheckMs) return;
+		nextRandomEventCheckMs = now + RANDOM_EVENT_CHECK_INTERVAL_MS;
+		for (int parent : RANDOM_EVENT_DIALOG_PARENTS) {
+			try {
+				Widget w2 = Rs2Widget.getWidget(parent);
+				if (w2 == null) continue;
+				Widget continueBtn = w2.getChild(RANDOM_EVENT_CONTINUE_CHILD);
+				if (continueBtn != null && !continueBtn.isHidden()) {
+					String txt = continueBtn.getText();
+					if (txt != null && (txt.toLowerCase(Locale.ROOT).contains("click here to continue") || txt.toLowerCase(Locale.ROOT).contains("continue"))) {
+						Rs2Widget.clickWidget(continueBtn);
+						Global.sleep(Rs2Random.between(500, 1500));
+						this.log("Dismissed random event dialog (widget " + parent + ")");
+						sessionTracker.recordAntiBan();
+						return;
+					}
+				}
+			} catch (Exception ignored) {}
+		}
+		try {
+			Widget w231 = Rs2Widget.getWidget(231);
+			if (w231 == null) return;
+			Widget npcDialog = w231.getChild(0);
+			if (npcDialog != null && !npcDialog.isHidden()) {
+				Widget npcName = w231.getChild(1);
+				if (npcName != null) {
+					String nm = npcName.getText();
+					String name = nm == null ? "" : nm.toLowerCase(Locale.ROOT);
+					if (name.contains("mysterious") || name.contains("drill") || name.contains("genie")
+							|| name.contains("captain") || name.contains("beekeeper") || name.contains("gravedigger")
+							|| name.contains("sandwich") || name.contains("frog") || name.contains("mime")
+							|| name.contains("quiz") || name.contains("demon") || name.contains("pillory")
+							|| name.contains("maze") || name.contains("strange")) {
+						Widget cont = w231.getChild(3);
+						if (cont != null && !cont.isHidden()) {
+							Rs2Widget.clickWidget(cont);
+							Global.sleep(Rs2Random.between(400, 1200));
+							this.log("Dismissed random event: " + nm);
+							sessionTracker.recordAntiBan();
+						}
+					}
+				}
+			}
+		} catch (Exception ignored) {}
+	}
+
+	private void handleAttackerRetaliation(Rs2PlayerModel localPlayer) {
+		if (localPlayer == null || !playerExists(localPlayer)) return;
+		if (this.isAttacking()) return;
+		Player attacker = getCharacterInteractingWithMe();
+		if (attacker == null || !playerExists(attacker) || attacker.getName() == null) return;
+		String attackerKey = attacker.getName().toLowerCase(Locale.ROOT).trim();
+
+		WorldPoint localTile = localPlayer.getWorldLocation();
+		boolean isInSafeZone = localTile != null && this.SAFE_ZONE.contains(localTile);
+		long fatigueRuntime = System.currentTimeMillis() - fatigueStart;
+		double fatigueFactor = this.getFatigueFactor(fatigueRuntime);
+		boolean prayersAvailable = Rs2Player.getBoostedSkillLevel(Skill.PRAYER) > 0;
+
+		AIAssistant.SuggestedReaction suggestion = aiAssistant.suggestReaction(
+				attacker, localPlayer, isInSafeZone, prayersAvailable, fatigueFactor, this.attackSet);
+
+		switch (suggestion.reaction) {
+			case DRAG_TO_SAFE:
+				if (!isInSafeZone && !noDragEnabled) {
+					addLureBotToDragList(attacker.getName());
+					ensureAutoRetaliateOff();
+					this.status = "AI: Drag to safe - " + suggestion.reason;
+					lureDragToSafe(new Rs2PlayerModel(attacker), localPlayer);
+					return;
+				}
+				if (noDragEnabled) {
+					this.status = "AI: No Drag - fighting " + attacker.getName();
+				} else {
+					this.status = "AI: Lure bot in safe, ignoring: " + attacker.getName();
+					return;
+				}
+			case FIGHT_BACK:
+				if (isPlayerInCombat(localPlayer)) return;
+				this.status = "AI: Retaliating against " + attacker.getName() + " - " + suggestion.reason;
+				long delay = aiAssistant.calculateHumanReactionDelay(fatigueFactor, true);
+				this.sleepWithFatigue((int) delay, (int) (delay + 200));
+				if (playerExists(attacker) && !isPlayerInCombat(localPlayer)) {
+					boolean attacked = rightClickInteract(attacker);
+					if (attacked) {
+						this.log("AI retaliation on " + attacker.getName());
+						sessionTracker.recordAttack();
+						playerStats.recordAttack(attacker.getName());
+						String[] gear = aiAssistant.generateWeaponList(attacker);
+						aiAssistant.learnFromEncounter(attacker.getName(), attacker.getCombatLevel(), gear, 99, true, false, true);
+					}
+				}
+				return;
+			case PRAY_MAGIC:
+			case PRAY_MELEE:
+			case PRAY_RANGED:
+				int prayerPoints = Rs2Player.getBoostedSkillLevel(Skill.PRAYER);
+				if (prayersAvailable) {
+					if (suggestion.reaction == AIAssistant.Reaction.PRAY_MAGIC) this.handleMagicAttack(prayerPoints);
+					else if (suggestion.reaction == AIAssistant.Reaction.PRAY_MELEE) this.handleMeleeAttack(prayerPoints);
+					else this.handleRangeAttack(prayerPoints);
+				}
+				break;
+			case IGNORE:
+			default:
+				break;
+		}
+
+		boolean theyRanAway = !isPlayerInCombat(localPlayer);
+		if (attacker.getCombatLevel() >= MIN_AUTO_ADD_ATTACKER_LEVEL) {
+			aiAssistant.recordAttackedBy(attacker.getName(), theyRanAway);
+			if (aiAssistant.isRepeatedLowLevelAttacker(attackerKey) && !theyRanAway && !this.attackSet.contains(attackerKey)) {
+				if (!clanMembers.contains(attackerKey)) {
+					this.addNameToList(attacker.getName());
+					this.log("Auto-added persistent low-level attacker to nslist: " + attacker.getName());
+				}
+			}
+		}
+	}
+
+	private Player getCharacterInteractingWithMe() {
+		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+		if (local == null) return null;
+		Player localPlayer = local.getPlayer();
+		if (localPlayer == null) return null;
+		return Rs2Player.getPlayers(p -> p != null && p != local
+				&& p.getInteracting() instanceof Player
+				&& p.getInteracting() == localPlayer).findFirst().orElse(null);
+	}
+
+	public int getTotalActions() {
+		return humanBehavior.getTotalActions();
+	}
+
+	public long getSessionDurationMinutes() {
+		return humanBehavior.getSessionDurationMinutes();
+	}
+
+	public boolean isAttackEnabled() {
+		return attackEnabled;
+	}
+
+	public void setAttackEnabled(boolean attackEnabled) {
+		this.attackEnabled = attackEnabled;
+	}
+
+	public boolean isWalkToTargetEnabled() {
+		return walkToTargetEnabled;
+	}
+
+	public void setWalkToTargetEnabled(boolean walkToTargetEnabled) {
+		this.walkToTargetEnabled = walkToTargetEnabled;
+	}
+
+	public boolean isQuickprayersEnabled() {
+		return quickprayersEnabled;
+	}
+
+	public void setQuickprayersEnabled(boolean quickprayersEnabled) {
+		this.quickprayersEnabled = quickprayersEnabled;
+	}
+
+	public boolean isPrayerOffEnabled() {
+		return prayerOffEnabled;
+	}
+
+	public void setPrayerOffEnabled(boolean prayerOffEnabled) {
+		this.prayerOffEnabled = prayerOffEnabled;
+	}
+
+	public boolean isSwitchPrayersEnabled() {
+		return switchPrayersEnabled;
+	}
+
+	public void setSwitchPrayersEnabled(boolean switchPrayersEnabled) {
+		this.switchPrayersEnabled = switchPrayersEnabled;
+	}
+
+	public boolean isFreeRoamEnabled() {
+		return freeRoamEnabled;
+	}
+
+	public void setFreeRoamEnabled(boolean freeRoamEnabled) {
+		this.freeRoamEnabled = freeRoamEnabled;
+	}
+
+	public boolean isProtectBluePhatsEnabled() {
+		return protectBluePhatsEnabled;
+	}
+
+	public void setProtectBluePhatsEnabled(boolean protectBluePhatsEnabled) {
+		this.protectBluePhatsEnabled = protectBluePhatsEnabled;
+	}
+
+	public boolean isReportEnabled() {
+		return reportEnabled;
+	}
+
+	public void setReportEnabled(boolean reportEnabled) {
+		this.reportEnabled = reportEnabled;
+	}
+
+	public void onPaint(Graphics g) {
+		if (this.timer2 == null || this.selectedLocation == null || this.status == null) {
+			return;
+		}
+		if (this.guiHidden) {
+			g.setColor(new Color(20, 20, 20, 200));
+			g.fillRect(this.guiToggleButton.x, this.guiToggleButton.y, this.guiToggleButton.width, this.guiToggleButton.height);
+			g.setColor(new Color(26, 180, 250));
+			g.drawRect(this.guiToggleButton.x, this.guiToggleButton.y, this.guiToggleButton.width, this.guiToggleButton.height);
+			g.setColor(Color.WHITE);
+			g.setFont(new Font("Arial", Font.BOLD, 14));
+			g.drawString("\u25B6", this.guiToggleButton.x + 10, this.guiToggleButton.y + 21);
+			return;
+		}
+		int width = 260;
+		int statsPaneX = width + 5;
+		int height = 540;
+
+		g.setColor(new Color(20, 20, 20, 200));
+		g.fillRect(0, 0, width, height);
+		g.setColor(new Color(26, 180, 250));
+		g.drawRect(0, 0, width - 1, height - 1);
+
+		g.setColor(new Color(26, 180, 250, 50));
+		g.fillRect(0, 0, width, 30);
+		g.setColor(Color.WHITE);
+		g.setFont(new Font("Arial", Font.BOLD, 16));
+		g.drawString("ViruzFFABot", 65, 22);
+
+		g.setColor(new Color(40, 40, 40));
+		g.fillRect(this.hideGuiButton.x, this.hideGuiButton.y, this.hideGuiButton.width, this.hideGuiButton.height);
+		g.setColor(new Color(26, 180, 250));
+		g.drawRect(this.hideGuiButton.x, this.hideGuiButton.y, this.hideGuiButton.width, this.hideGuiButton.height);
+		g.setColor(Color.WHITE);
+		g.setFont(new Font("Arial", Font.BOLD, 12));
+		g.drawString("\u00D7", this.hideGuiButton.x + 6, this.hideGuiButton.y + 15);
+
+		g.setFont(new Font("Arial", Font.PLAIN, 12));
+		this.drawCheckbox(g, this.attackBox, "Attack", this.isAttackEnabled());
+		this.drawCheckbox(g, this.walkToTargetBox, "Walk to target", this.isWalkToTargetEnabled());
+		this.drawCheckbox(g, this.quickprayerBox, "Quick prayer", this.isQuickprayersEnabled());
+		this.drawCheckbox(g, this.prayerOffBox, "Turn prayer off if no target", this.isPrayerOffEnabled());
+		this.drawCheckbox(g, this.switchPrayersBox, "Switch prayers", this.isSwitchPrayersEnabled());
+		this.drawCheckbox(g, this.freeRoamBox, "Free roam", this.isFreeRoamEnabled());
+		this.drawCheckbox(g, this.protectBluePhatsBox, "Protect BluePhats", this.isProtectBluePhatsEnabled());
+		this.drawCheckbox(g, this.reportBox, "Report targets", this.isReportEnabled());
+		this.drawCheckbox(g, this.chatGrabberBox, "Chat grabber", this.chatGrabberEnabled.get());
+		this.drawCheckbox(g, this.focusPlayersBox, "Focus Players", this.focusPlayersEnabled);
+		this.drawCheckbox(g, this.lureMultiBox, "Lure Multi", this.lureMultiEnabled);
+		this.drawCheckbox(g, this.scanHillsBox, "Scan Hills", this.hillScanEnabled);
+		this.drawCheckbox(g, this.noDragBox, "No Drag", this.noDragEnabled);
+		this.drawCheckbox(g, this.unlistBox, "Unlist", this.unlistEnabled);
+		this.drawCheckbox(g, this.whitelistBox, "Whitelist", this.whitelistEnabled);
+		this.drawComboBox(g);
+
+		g.setColor(new Color(26, 180, 250, 30));
+		g.fillRect(0, height - 105, width, 105);
+		int line = height - 100;
+		g.setFont(new Font("Consolas", Font.PLAIN, 11));
+		g.setColor(new Color(200, 220, 255));
+		g.drawString(fitText(g, "Runtime: " + this.timer2.formatTime(), width - 15), 10, line); line += 12;
+
+		long runtime = System.currentTimeMillis() - this.fatigueStart;
+		double currentFatigue = this.getFatigueFactor(runtime);
+		String fatigueStr = String.format("Fatigue: %.1f/20", currentFatigue);
+		if (this.energyBoost > 0.01) {
+			fatigueStr += String.format(" (B:%.1f)", this.energyBoost);
+		}
+		Color fatigueColor = currentFatigue > 12.0 ? new Color(255, 100, 100) :
+				currentFatigue > 6.0 ? new Color(255, 200, 80) :
+						new Color(150, 210, 255);
+		g.setColor(fatigueColor);
+		if (this.fatigueSpikeEndTime > System.currentTimeMillis()) {
+			fatigueStr += " [S]";
+		}
+		if (this.performanceStreakEndTime > System.currentTimeMillis()) {
+			fatigueStr += " [2W]";
+		}
+		g.drawString(fitText(g, fatigueStr, width - 15), 10, line); line += 12;
+
+		Color statusColor = this.status.contains("Error") || this.status.contains("AFK") ?
+				new Color(255, 120, 120) : new Color(180, 200, 255);
+		g.setColor(statusColor);
+		g.drawString(fitText(g, "Status: " + this.status, width - 15), 10, line); line += 13;
+
+		g.drawString(fitText(g, "Actions: " + this.getTotalActions() + " | Session: " + this.getSessionDurationMinutes() + "m", width - 15), 10, line); line += 12;
+
+		g.setColor(new Color(180, 140, 255, 50));
+		g.drawLine(5, line, width - 5, line); line += 5;
+
+		g.setFont(new Font("Arial", Font.BOLD, 11));
+		g.setColor(new Color(180, 140, 255));
+		g.drawString("AI PROFILES", 10, line); line += 13;
+
+		int profileCount = aiAssistant.getPlayerProfiles().size();
+		g.setFont(new Font("Consolas", Font.PLAIN, 10));
+		g.setColor(new Color(180, 180, 180));
+		g.drawString("Tracking: " + profileCount + " players", 10, line); line += 11;
+
+		if (!aiAssistant.getPlayerProfiles().isEmpty()) {
+			java.util.Optional<Map.Entry<String, AIAssistant.PlayerProfile>> topThreat = aiAssistant.getPlayerProfiles().entrySet().stream()
+					.max(java.util.Comparator.comparingDouble(e -> e.getValue().threatDisplay()));
+			if (topThreat.isPresent()) {
+				double threat = topThreat.get().getValue().threatDisplay();
+				Color threatColor = threat >= 5.0 ? new Color(255, 70, 70) :
+						threat >= 3.0 ? new Color(255, 165, 50) :
+								threat >= 1.0 ? new Color(255, 220, 80) :
+										new Color(100, 220, 100);
+				g.setColor(threatColor);
+				String topStr = String.format("Top: %s [%.2f]", topThreat.get().getKey(), threat);
+				g.drawString(fitText(g, topStr, width - 15), 10, line);
+			}
+		} else {
+			g.setColor(new Color(120, 120, 120));
+			g.drawString("No data yet", 10, line);
+		}
+
+		line += 2;
+		purgeListButton.y = line;
+		reEnergizeButton.y = line;
+		Point guiMouse = Microbot.getMouse().getMousePosition();
+		boolean hovered = guiMouse != null && purgeListButton.contains(guiMouse);
+		g.setColor(hovered ? new Color(60, 55, 70) : new Color(45, 40, 55));
+		g.fillRoundRect(purgeListButton.x, purgeListButton.y, purgeListButton.width, purgeListButton.height, 3, 3);
+		g.setColor(new Color(180, 140, 255, 150));
+		g.drawRoundRect(purgeListButton.x, purgeListButton.y, purgeListButton.width, purgeListButton.height, 3, 3);
+		g.setFont(new Font("Consolas", Font.PLAIN, 10));
+		g.setColor(new Color(200, 200, 220));
+		g.drawString("Purge List", purgeListButton.x + 10, purgeListButton.y + 12);
+		boolean hoveredRe = guiMouse != null && reEnergizeButton.contains(guiMouse);
+		g.setColor(hoveredRe ? new Color(60, 80, 60) : new Color(35, 50, 35));
+		g.fillRoundRect(reEnergizeButton.x, reEnergizeButton.y, reEnergizeButton.width, reEnergizeButton.height, 3, 3);
+		g.setColor(new Color(100, 220, 100, 150));
+		g.drawRoundRect(reEnergizeButton.x, reEnergizeButton.y, reEnergizeButton.width, reEnergizeButton.height, 3, 3);
+		g.setFont(new Font("Consolas", Font.PLAIN, 10));
+		g.setColor(new Color(200, 220, 200));
+		g.drawString("ReEnergize", reEnergizeButton.x + 6, reEnergizeButton.y + 12);
+		line += 17;
+
+		g.setFont(new Font("Arial", Font.BOLD, 10));
+		g.setColor(new Color(100, 100, 100));
+		g.drawString("v" + VERSION, width - 28, line);
+
+		int statsWidth = 194;
+		int statsPanelY = 20;
+		int statsPanelH = 210;
+		g.setColor(new Color(15, 15, 20, 200));
+		g.fillRoundRect(statsPaneX - 3, statsPanelY, statsWidth, statsPanelH, 5, 5);
+		g.setColor(new Color(26, 180, 250, 60));
+		g.drawRoundRect(statsPaneX - 3, statsPanelY, statsWidth - 1, statsPanelH - 1, 5, 5);
+		g.setColor(new Color(26, 180, 250, 12));
+		g.fillRect(statsPaneX - 1, statsPanelY, statsWidth - 4, 18);
+		sessionTracker.drawStats(g, statsPaneX, statsPanelY + 10, currentFatigue);
+
+		int nttY = statsPanelY + statsPanelH + 8;
+		int nttH = 72;
+		g.setColor(new Color(15, 15, 20, 200));
+		g.fillRoundRect(statsPaneX - 3, nttY, statsWidth, nttH, 5, 5);
+		g.setColor(new Color(26, 180, 250, 60));
+		g.drawRoundRect(statsPaneX - 3, nttY, statsWidth - 1, nttH - 1, 5, 5);
+		g.setFont(new Font("Arial", Font.BOLD, 11));
+		g.setColor(new Color(26, 180, 250));
+		g.drawString("NON-TARGET TRACKER", statsPaneX, nttY + 14);
+		g.setFont(new Font("Consolas", Font.PLAIN, 10));
+		g.setColor(new Color(180, 180, 180));
+		g.drawString("Tracked: " + nonTargetTracker.getTrackedCount() + " players", statsPaneX, nttY + 30);
+		Map<String, NonTargetTracker.LastSeenEntry> nttEntries = nonTargetTracker.getEntries();
+		if (!nttEntries.isEmpty()) {
+			NonTargetTracker.LastSeenEntry last = nttEntries.values().stream()
+					.max(Comparator.comparingLong(NonTargetTracker.LastSeenEntry::getLastSeenMs))
+					.orElse(null);
+			if (last != null) {
+				String lastStr = String.format("Last: %s @%s (%d,%d,%d) cb=%d",
+						last.getPlayerName(), last.getLocation(),
+						last.getX(), last.getY(), last.getZ(),
+						last.getCombatLevel());
+				int lastMax = statsWidth - 10;
+				if (g.getFontMetrics().stringWidth(lastStr) > lastMax) {
+					lastStr = String.format("Last: %s @%s", last.getPlayerName(), last.getLocation());
+				}
+				if (g.getFontMetrics().stringWidth(lastStr) > lastMax) {
+					String lname = last.getPlayerName();
+					String lloc = last.getLocation();
+					while (lname.length() > 1 && g.getFontMetrics().stringWidth("Last: " + lname + "~ @") > lastMax) {
+						lname = lname.substring(0, lname.length() - 1);
+					}
+					while (lloc.length() > 1 && g.getFontMetrics().stringWidth("Last: " + lname + "~@" + lloc + "~") > lastMax) {
+						lloc = lloc.substring(0, lloc.length() - 1);
+					}
+					lastStr = "Last: " + lname + "~@" + lloc;
+				}
+				g.drawString(lastStr, statsPaneX, nttY + 44);
+			}
+		}
+		g.setColor(new Color(100, 100, 100, 80));
+		g.drawLine(statsPaneX, nttY + 56, statsPaneX + statsWidth - 10, nttY + 56);
+		g.setColor(new Color(120, 120, 120));
+		g.drawString("next save in " + (30000 - (System.currentTimeMillis() % 30000)) / 1000 + "s", statsPaneX + 4, nttY + 66);
+
+		int psY = nttY + nttH + 8;
+		int psH = 130;
+		g.setColor(new Color(15, 15, 20, 200));
+		g.fillRoundRect(statsPaneX - 3, psY, statsWidth, psH, 5, 5);
+		g.setColor(new Color(26, 180, 250, 60));
+		g.drawRoundRect(statsPaneX - 3, psY, statsWidth - 1, psH - 1, 5, 5);
+		g.setColor(new Color(26, 180, 250, 12));
+		g.fillRect(statsPaneX - 1, psY, statsWidth - 4, 18);
+		g.setFont(new Font("Arial", Font.BOLD, 11));
+		g.setColor(new Color(26, 180, 250));
+		g.drawString("ALL-TIME STATS", statsPaneX, psY + 14);
+		g.setFont(new Font("Consolas", Font.PLAIN, 10));
+		g.setColor(new Color(200, 220, 255));
+		g.drawString("Runtime: " + playerStats.getRuntimeString(), statsPaneX, psY + 30);
+		g.setColor(new Color(180, 200, 255));
+		g.drawString(fitText(g, "Current Runtime: " + this.timer2.formatTime(), statsWidth - 10), statsPaneX, psY + 42);
+		g.setColor(new Color(130, 200, 130));
+		g.drawString("XP Earned: " + playerStats.getTotalXpEarned(), statsPaneX, psY + 54);
+		List<Map.Entry<String, Integer>> bullied = playerStats.getTopBullied(5);
+		if (!bullied.isEmpty()) {
+			g.setColor(new Color(255, 160, 100));
+			int by = psY + 68;
+			int maxWidth = statsWidth - 10;
+			for (Map.Entry<String, Integer> entry : bullied) {
+				String name = entry.getKey();
+				String lineStr = name + ": " + entry.getValue();
+				if (g.getFontMetrics().stringWidth(lineStr) > maxWidth) {
+					while (g.getFontMetrics().stringWidth(lineStr) > maxWidth && name.length() > 1) {
+						name = name.substring(0, name.length() - 1);
+						lineStr = name + "~: " + entry.getValue();
+					}
+				}
+				g.drawString(lineStr, statsPaneX, by);
+				by += 12;
+			}
+		} else {
+			g.setColor(new Color(120, 120, 120));
+			g.drawString("No targets attacked yet", statsPaneX, psY + 68);
+		}
+	}
+
+	private void drawCheckbox(Graphics g, Rectangle rect, String label, boolean checked) {
+		g.setColor(new Color(40, 40, 40));
+		g.fillRect(rect.x, rect.y, rect.width, rect.height);
+		g.setColor(checked ? new Color(26, 180, 250) : Color.GRAY);
+		g.drawRect(rect.x, rect.y, rect.width, rect.height);
+		if (checked) {
+			g.setColor(new Color(26, 180, 250));
+			g.fillRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6);
+		}
+		g.setColor(Color.WHITE);
+		g.setFont(new Font("Arial", Font.PLAIN, 12));
+		g.drawString(label, rect.x + 22, rect.y + 12);
+	}
+
+	private String fitText(Graphics g, String text, int maxWidth) {
+		if (g.getFontMetrics().stringWidth(text) <= maxWidth) return text;
+		while (text.length() > 1 && g.getFontMetrics().stringWidth(text + "~") > maxWidth) {
+			text = text.substring(0, text.length() - 1);
+		}
+		return text + "~";
+	}
+
+	private void drawComboBox(Graphics g) {
+		g.setColor(new Color(40, 40, 40));
+		g.fillRect(this.locationComboBox.x, this.locationComboBox.y, this.locationComboBox.width, this.locationComboBox.height);
+		g.setColor(new Color(26, 180, 250));
+		g.drawRect(this.locationComboBox.x, this.locationComboBox.y, this.locationComboBox.width, this.locationComboBox.height);
+		g.setColor(Color.WHITE);
+		g.setFont(new Font("Arial", Font.BOLD, 12));
+		g.drawString(this.selectedLocation, this.locationComboBox.x + 5, this.locationComboBox.y + 15);
+		int arrowX = this.locationComboBox.x + this.locationComboBox.width - 15;
+		int arrowY = this.locationComboBox.y + 15;
+		g.drawString(this.comboBoxExpanded ? "\u25B2" : "\u25BC", arrowX, arrowY);
+		if (this.comboBoxExpanded) {
+			for (int i = 0; i < this.locationOptions.size(); ++i) {
+				int optionY = this.locationComboBox.y + (i + 1) * 20;
+				String location = this.locationOptions.get(i);
+				g.setColor(new Color(30, 30, 30));
+				g.fillRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
+				g.setColor(new Color(60, 60, 60));
+				g.drawRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
+				if (location.equals(this.selectedLocation)) {
+					g.setColor(new Color(26, 180, 250, 100));
+					g.fillRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
+				}
+				g.setColor(Color.WHITE);
+				g.setFont(new Font("Arial", Font.PLAIN, 12));
+				g.drawString(location, this.locationComboBox.x + 5, optionY + 15);
+			}
+		}
+	}
+
+	public void mousePressed(MouseEvent e) {
+	}
+
+	public void mouseReleased(MouseEvent e) {
+	}
+
+	public void mouseEntered(MouseEvent e) {
+	}
+
+	public void mouseExited(MouseEvent e) {
+	}
+}
