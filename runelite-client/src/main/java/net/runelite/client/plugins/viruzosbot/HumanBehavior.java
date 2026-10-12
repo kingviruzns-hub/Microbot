@@ -9,6 +9,8 @@ import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 
+import lombok.Getter;
+
 import java.awt.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -21,7 +23,9 @@ public class HumanBehavior {
     private static final long NATURAL_MOVE_INTERVAL_MS = 30000;
 
     private long sessionStartTime;
+    @Getter
     private int totalActions;
+    @Getter
     private int currentFatigueLevel;
     private long nextDistractionTime;
 
@@ -218,14 +222,6 @@ public class HumanBehavior {
         sessionStartTime = System.currentTimeMillis();
         totalActions = 0;
         currentFatigueLevel = 0;
-    }
-
-    public int getTotalActions() {
-        return totalActions;
-    }
-
-    public int getCurrentFatigueLevel() {
-        return currentFatigueLevel;
     }
 
     public long getSessionDurationMinutes() {

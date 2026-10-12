@@ -598,3 +598,4 @@ tasks.withType<Test> {
 tasks.javadoc {
     title = "RuneLite Client ${project.version} API"
 }
+

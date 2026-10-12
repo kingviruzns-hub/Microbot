@@ -3,11 +3,12 @@ package net.runelite.client.plugins.viruzosbot;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import lombok.Getter;
+import lombok.Setter;
 import net.runelite.api.Actor;
 import net.runelite.api.EquipmentInventorySlot;
-import net.runelite.api.HeadIcon;
-import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.ObjectComposition;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.kit.KitType;
@@ -16,19 +17,20 @@ import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.client.RuneLiteDebug;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.Script;
+import net.runelite.client.plugins.microbot.api.tileobject.models.Rs2TileObjectModel;
+import net.runelite.client.plugins.microbot.api.tileobject.models.TileObjectType;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.math.Rs2Random;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
-import net.runelite.client.plugins.microbot.util.combat.Rs2Combat;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.menu.NewMenuEntry;
 import net.runelite.client.plugins.microbot.util.misc.Rs2UiHelper;
-import net.runelite.client.plugins.microbot.util.mouse.Mouse;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.player.Rs2PlayerModel;
 import net.runelite.client.plugins.microbot.util.prayer.Rs2Prayer;
@@ -45,8 +47,6 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -64,21 +64,27 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.nio.file.Paths.get;
 
-@SuppressWarnings({"deprecation", "removal"})
+
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
 	private static final String VERSION = "1.0.0";
+
+	public static void main(String[] args) throws Exception {
+		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
+		RuneLiteDebug.main(args);
+	}
 	private static final int REPORT_WIDGET_PARENT = 875;
 	private static final int REASON_PARENT_CHILD_INDEX = 19;
 	private static final int MACRO_REASON_CHILD_INDEX = 0;
@@ -124,13 +130,29 @@ public class ViruzFFABotScript extends Script
 	private final WorldArea SECOND_TOWER1 = new WorldArea(3364, 4812, 3, 6, 0);
 	private final WorldArea SECOND_TOWER2 = new WorldArea(3366, 4812, 4, 3, 0);
 	private final WorldArea SECOND_TOWER3 = new WorldArea(3369, 4806, 5, 9, 0);
+	@Getter
+	@Setter
 	private boolean attackEnabled = true;
+	@Getter
+	@Setter
 	private boolean walkToTargetEnabled = false;
+	@Getter
+	@Setter
 	private boolean quickprayersEnabled = false;
+	@Getter
+	@Setter
 	private boolean prayerOffEnabled = false;
+	@Getter
+	@Setter
 	private boolean switchPrayersEnabled = false;
+	@Getter
+	@Setter
 	private boolean freeRoamEnabled = false;
+	@Getter
+	@Setter
 	private boolean protectBluePhatsEnabled = false;
+	@Getter
+	@Setter
 	private boolean reportEnabled = false;
 	private boolean comboBoxExpanded = false;
 	private int antiLureScan = 0;
@@ -174,12 +196,6 @@ public class ViruzFFABotScript extends Script
 	private static final Set<Integer> RANGE_ATTACK_ANIMATIONS = Set.of(426, 4230, 929);
 	private static final Set<Integer> MELEE_ATTACK_ANIMATIONS = Set.of(390, 386, 388, 400, 401, 407, 406, 393, 395, 412, 422, 419);
 	private static final String[] MELEE_WEAPONS = new String[]{"Rune scimitar", "Rune sword", "Rune longsword", "Rune axe", "Rune pickaxe", "Rune mace", "Rune warhammer", "Rune battleaxe", "Rune dagger", "Gilded scimitar", "Gilded spade", "Gilded pickaxe", "Gilded axe"};
-	private static final String[] MELEE_SHIELDS = new String[]{"Rune kiteshield", "Rune kiteshield (t)", "Rune kiteshield (g)", "Saradomin kiteshield", "Zamorak kiteshield", "Bandos kiteshield", "Armadyl kiteshield", "Guthix kiteshield", "Ancient kiteshield", "Gilded kiteshield", "Rune shield (h1)", "Rune shield (h2)", "Rune shield (h3)", "Rune shield (h4)", "Rune shield (h5)"};
-	private static final String[] MELEE_BODY = new String[]{"Rune platebody", "Rune platebody (t)", "Rune platebody (g)", "Saradomin platebody", "Zamorak platebody", "Bandos platebody", "Armadyl platebody", "Guthix platebody", "Ancient platebody", "Gilded platebody", "Rune platebody (h1)", "Rune platebody (h2)", "Rune platebody (h3)", "Rune platebody (h4)", "Rune platebody (h5)"};
-	private static final String[] MELEE_LEGS = new String[]{"Rune platelegs", "Rune platelegs (t)", "Rune platelegs (g)", "Saradomin platelegs", "Zamorak platelegs", "Bandos platelegs", "Armadyl platelegs", "Guthix platelegs", "Ancient platelegs", "Gilded platelegs", "Rune platelegs (h1)", "Rune platelegs (h2)", "Rune platelegs (h3)", "Rune platelegs (h4)", "Rune platelegs (h5)"};
-	private static final String[] RANGED_WEAPONS = new String[]{"Maple shortbow"};
-	private static final String[] RANGED_BODY = new String[]{"Gilded d'hide body", "Green d'hide body", "Green d'hide body (g)", "Green d'hide body (t)"};
-	private static final String[] RANGED_CHAPS = new String[]{"Gilded d'hide chaps", "Green d'hide chaps", "Green d'hide chaps (g)", "Green d'hide chaps (t)"};
 
 	private static final long CHAT_GRAB_COOLDOWN_MS = 2500L;
 	private final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
@@ -227,14 +243,6 @@ public class ViruzFFABotScript extends Script
 	private long lastForcedBreakMs = 0L;
 	private long nextAntiBanAtMs = 0L;
 	private final AIAssistant aiAssistant = new AIAssistant();
-	private static final int SCREEN_WIDTH = 765;
-	private static final int SCREEN_HEIGHT = 503;
-	private long lastNaturalMouseMove = 0L;
-	private static final long NATURAL_MOVE_INTERVAL_MS = 30000;
-	private long sessionStartTime = System.currentTimeMillis();
-	private int totalActions;
-	private int currentFatigueLevel;
-	private long nextDistractionTime;
 	private final SessionTracker sessionTracker = new SessionTracker();
 	private final NonTargetTracker nonTargetTracker = new NonTargetTracker();
 	private final PlayerStats playerStats = new PlayerStats();
@@ -261,8 +269,6 @@ public class ViruzFFABotScript extends Script
 	private int lastSwitchLevelForCurrentStyle = -1;
 	private int nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
 	private long nextAttackStyleCheckMs = 0L;
-
-	private final Map<String, WorldPoint> playerLastLocations = new HashMap<>();
 
 	public enum ChatEventType {
 		CLAN_CHAT, CHAT_CHANNEL, PRIVATE_INFO, OTHER
@@ -299,7 +305,7 @@ public class ViruzFFABotScript extends Script
 				try {
 					int val = Integer.parseInt(raw.substring(14).trim());
 					this.setCurrentThreshold(val);
-					log.info("Threshold set to: " + val);
+					log.info("Threshold set to: {}", val);
 					sendDiscordEmbed("⚙️ Threshold set to: **" + val + " ms**");
 				} catch (NumberFormatException e) {
 					log.info("Invalid threshold value.");
@@ -308,7 +314,7 @@ public class ViruzFFABotScript extends Script
 			}
 			if (text.equals("!getthreshold")) {
 				int val = this.getCurrentThreshold();
-				log.info("Current threshold: " + val);
+				log.info("Current threshold: {}", val);
 				sendDiscordEmbed("⚙️ Current threshold: **" + val + " ms**");
 				return;
 			}
@@ -337,7 +343,7 @@ public class ViruzFFABotScript extends Script
 							int x2 = Integer.parseInt(parts[2]);
 							int y2 = Integer.parseInt(parts[3]);
 							this.currentArea = new WorldArea(x1, y1, Math.abs(x2 - x1) + 1, Math.abs(y2 - y1) + 1, 0);
-							log.info("Target area set to: " + x1 + ", " + y1 + ", " + x2 + ", " + y2);
+							log.info("Target area set to: {}, {}, {}, {}", x1, y1, x2, y2);
 							sendDiscordEmbed("📍 Target area set to: **" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + "**");
 						} catch (NumberFormatException e) {
 							log.info("Invalid area coordinates");
@@ -376,7 +382,7 @@ public class ViruzFFABotScript extends Script
 						log.info(info);
 						sendDiscordEmbed(info);
 					} else {
-						log.info("No profile found for " + targetName);
+						log.info("No profile found for {}", targetName);
 					}
 				}
 				return;
@@ -395,7 +401,7 @@ public class ViruzFFABotScript extends Script
 				return;
 			}
 		}
-		grabChatMessage(message, type);
+		grabChatMessage(message);
 	}
 
 	private ChatEventType resolveType(ChatMessage message) {
@@ -423,7 +429,7 @@ public class ViruzFFABotScript extends Script
 		Path path = get(Config.getBluePhatsFilePath());
 		authorizedUsers.clear();
 		if (!Files.exists(path)) {
-			log.info("Authorization file not found at " + path + ". Remote commands disabled.");
+			log.info("Authorization file not found at {}. Remote commands disabled.", path);
 			return;
 		}
 		try {
@@ -437,10 +443,10 @@ public class ViruzFFABotScript extends Script
 						authorizedUsers.add(name.toLowerCase(Locale.ROOT).replace("\u00A0", " ").trim());
 					}
 				}
-				log.info("Loaded " + authorizedUsers.size() + " authorized users from bluephats.json.");
+				log.info("Loaded {} authorized users from bluephats.json.", authorizedUsers.size());
 			}
 		} catch (IOException e) {
-			log.info("Failed to parse bluephats.json: " + e.getMessage());
+			log.info("Failed to parse bluephats.json: {}", e.getMessage());
 		}
 	}
 
@@ -452,7 +458,7 @@ public class ViruzFFABotScript extends Script
 		return authorizedUsers.contains(cleanSender);
 	}
 
-	private void grabChatMessage(ChatMessage message, ChatEventType type) {
+	private void grabChatMessage(ChatMessage message) {
 		if (!chatGrabberEnabled.get()) return;
 		String senderRaw = message.getName();
 		String content = message.getMessage();
@@ -503,9 +509,9 @@ public class ViruzFFABotScript extends Script
 				bw.write(name);
 				bw.newLine();
 			}
-			log.info("Successfully saved " + this.attackSet.size() + " names to nslist.txt.");
+			log.info("Successfully saved {} names to nslist.txt.", this.attackSet.size());
 		} catch (IOException e) {
-			log.info("Error saving nslist.txt: " + e.getMessage());
+			log.info("Error saving nslist.txt: {}", e.getMessage());
 		}
 	}
 
@@ -525,10 +531,10 @@ public class ViruzFFABotScript extends Script
 				for (String name : loaded) {
 					this.bluePhatNames.add(name.toLowerCase().trim());
 				}
-				log.info("Loaded " + this.bluePhatNames.size() + " blue phat players.");
+				log.info("Loaded {} blue phat players.", this.bluePhatNames.size());
 			}
 		} catch (Exception e) {
-			log.info("Error loading bluephats.json: " + e.getMessage());
+			log.info("Error loading bluephats.json: {}", e.getMessage());
 		}
 	}
 
@@ -540,9 +546,9 @@ public class ViruzFFABotScript extends Script
 			List<String> list = new ArrayList<>(this.bluePhatNames);
 			String json = new GsonBuilder().setPrettyPrinting().create().toJson(list);
 			Files.writeString(path, json);
-			log.info("Saved " + this.bluePhatNames.size() + " blue phat players to bluephats.json.");
+			log.info("Saved {} blue phat players to bluephats.json.", this.bluePhatNames.size());
 		} catch (Exception e) {
-			log.info("Error saving bluephats.json: " + e.getMessage());
+			log.info("Error saving bluephats.json: {}", e.getMessage());
 		}
 	}
 
@@ -550,22 +556,22 @@ public class ViruzFFABotScript extends Script
 		String lowerName = name.toLowerCase().trim();
 		for (String blocked : BLOCKED_NAMES) {
 			if (blocked.equalsIgnoreCase(lowerName)) {
-				log.info("Attempted to add blocked name: " + name + ". Ignoring.");
+				log.info("Attempted to add blocked name: {}. Ignoring.", name);
 				return;
 			}
 		}
 		if (clanMembers.contains(lowerName)) {
-			log.info("Refusing to add clan member to nslist: " + name);
+			log.info("Refusing to add clan member to nslist: {}", name);
 			return;
 		}
 		if (this.attackSet.contains(lowerName)) {
-			log.info("Name already in list: " + name);
+			log.info("Name already in list: {}", name);
 			return;
 		}
 		this.attackSet.add(lowerName);
 		this.targets.add(lowerName);
 		saveListToFile();
-		log.info("Added " + name + " to nslist.txt");
+		log.info("Added {} to nslist.txt", name);
 		sendDiscordEmbed("📝 Added **" + name + "** to nslist.txt");
 	}
 
@@ -576,7 +582,7 @@ public class ViruzFFABotScript extends Script
 		if (lureDragSet.contains(lowerName)) return;
 		lureDragSet.add(lowerName);
 		saveLureDragSet();
-		log.info("Added " + name + " to luredrag.txt");
+		log.info("Added {} to luredrag.txt", name);
 		sendDiscordEmbed("Added **" + name + "** to luredrag.txt");
 	}
 
@@ -586,9 +592,9 @@ public class ViruzFFABotScript extends Script
 			Path parent = path.getParent();
 			if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
 			Files.write(path, lureDragSet, StandardCharsets.UTF_8);
-			log.info("Saved " + lureDragSet.size() + " names to luredrag.txt.");
+			log.info("Saved {} names to luredrag.txt.", lureDragSet.size());
 		} catch (IOException e) {
-			log.info("Error saving luredrag.txt: " + e.getMessage());
+			log.info("Error saving luredrag.txt: {}", e.getMessage());
 		}
 	}
 
@@ -607,9 +613,9 @@ public class ViruzFFABotScript extends Script
 					lureDragSet.add(trimmed);
 				}
 			}
-			log.info("Loaded " + lureDragSet.size() + " names from luredrag.txt.");
+			log.info("Loaded {} names from luredrag.txt.", lureDragSet.size());
 		} catch (IOException e) {
-			log.info("Error loading luredrag.txt: " + e.getMessage());
+			log.info("Error loading luredrag.txt: {}", e.getMessage());
 		}
 	}
 
@@ -619,19 +625,19 @@ public class ViruzFFABotScript extends Script
 		if (this.attackSet.remove(lowerName)) {
 			this.targets.remove(lowerName);
 			saveListToFile();
-			log.info("Removed " + name + " from nslist.txt");
+			log.info("Removed {} from nslist.txt", name);
 			sendDiscordEmbed("🗑️ Removed **" + name + "** from nslist.txt");
 		} else {
-			log.info("Name not found in list: " + name);
+			log.info("Name not found in list: {}", name);
 		}
 	}
 
 	private void removeNameFromAiData(String name) {
 		boolean removed = aiAssistant.removeProfile(name);
 		if (removed) {
-			log.info("Removed " + name + " from ai_data.json");
+			log.info("Removed {} from ai_data.json", name);
 		} else {
-			log.info(name + " not found in ai_data.json");
+			log.info("{} not found in ai_data.json", name);
 		}
 	}
 
@@ -662,7 +668,7 @@ public class ViruzFFABotScript extends Script
 		saveListToFile();
 		readMainUserFile();
 		loadList();
-		log.info("Unlist complete. Removed: " + removedNames);
+		log.info("Unlist complete. Removed: {}", removedNames);
 		sendDiscordEmbed("🗑️ Unlisted: **" + removedNames + "**");
 	}
 
@@ -695,7 +701,7 @@ public class ViruzFFABotScript extends Script
 		readMainUserFile();
 		loadList();
 		loadBluePhatSet();
-		log.info("Whitelist complete. Added: " + addedNames);
+		log.info("Whitelist complete. Added: {}", addedNames);
 		sendDiscordEmbed("⚪ Whitelisted: **" + addedNames + "**");
 	}
 
@@ -703,7 +709,6 @@ public class ViruzFFABotScript extends Script
 		if (target == null) return false;
 		try {
 			Map<net.runelite.api.kit.KitType, Integer> equipped = Rs2Player.getPlayerEquipmentIds(new Rs2PlayerModel(target));
-			if (equipped == null) return false;
 			for (Map.Entry<net.runelite.api.kit.KitType, Integer> e : equipped.entrySet()) {
 				net.runelite.api.ItemComposition comp = Microbot.getClientThread().runOnClientThreadOptional(() ->
 						Microbot.getClient().getItemDefinition(e.getValue())).orElse(null);
@@ -712,6 +717,7 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 		} catch (Exception e) {
+			// ignore item definition lookup failures
 		}
 		return false;
 	}
@@ -736,7 +742,7 @@ public class ViruzFFABotScript extends Script
 
 		String safeName = rawName.replace("\\", "\\\\").replace("\"", "\\\"");
 		sendDiscordEmbed("Removed from target-list for being fellow BluePhat - **" + safeName + "**");
-		log.info("BluePhat detected and handled: " + rawName);
+		log.info("BluePhat detected and handled: {}", rawName);
 	}
 
 	static class Timer {
@@ -764,6 +770,7 @@ public class ViruzFFABotScript extends Script
 
 	private long lastInCombatMs = 0L;
 	private boolean wasInFfaArea = false;
+	private long postCombatPauseUntilMs = 0L;
 
 	@Override
 	public boolean run() {
@@ -774,7 +781,7 @@ public class ViruzFFABotScript extends Script
 				if (!super.run()) return;
 				onLoop();
 			} catch (Exception ex) {
-				log.info("Error in main loop: " + ex.getMessage());
+				log.info("Error in main loop: {}", ex.getMessage());
 			}
 		}, 0, 600, TimeUnit.MILLISECONDS);
 		return true;
@@ -1018,6 +1025,10 @@ public class ViruzFFABotScript extends Script
 				this.lookAround();
 			}
 
+			if (!isPlayerInCombat(localPlayer) && this.isAtDesignatedArea(localPlayer)) {
+				this.naturalIdle();
+			}
+
 			final long now = System.currentTimeMillis();
 			if (now >= forcedBreakUntilMs && now - lastForcedBreakMs >= MIN_BREAK_INTERVAL_MS) {
 				long sessionElapsed = now - sessionStartMs;
@@ -1079,7 +1090,8 @@ public class ViruzFFABotScript extends Script
 			handleAttackerRetaliation(localPlayer);
 			if (now >= nextNonTargetScanMs) {
 				scanNonTargets(localPlayer);
-				nextNonTargetScanMs = now + 5000 + Rs2Random.between(0, 3000);
+				double scanFatigue = this.getFatigueFactor(now - sessionStartMs);
+				nextNonTargetScanMs = now + sessionTracker.getRecommendedScanInterval(scanFatigue);
 			}
 			nonTargetTracker.tickSave();
 			if (playerStats.shouldPeriodicSave()) {
@@ -1204,15 +1216,24 @@ public class ViruzFFABotScript extends Script
 
 	private void handleInFFA(Rs2PlayerModel localPlayer) {
 		if (!isPlayerInCombat(localPlayer)) {
-			if (lastInCombatMs > 0 && System.currentTimeMillis() - lastInCombatMs > 3000) {
-				sessionTracker.recordCombatEnd();
-				if (Rs2Random.between(0, 100) < 25) {
-					this.postCombatGlance();
+			if (lastInCombatMs > 0) {
+				final long combatEndNow = System.currentTimeMillis();
+				if (postCombatPauseUntilMs == 0L) {
+					double postCombatFatigue = this.getFatigueFactor(combatEndNow - fatigueStart);
+					postCombatPauseUntilMs = combatEndNow + sessionTracker.getRecommendedPostCombatPause(postCombatFatigue);
+				}
+				if (combatEndNow >= postCombatPauseUntilMs) {
+					sessionTracker.recordCombatEnd();
+					postCombatPauseUntilMs = 0L;
+					if (Rs2Random.between(0, 100) < 25) {
+						this.postCombatGlance();
+					}
 				}
 			}
 		} else {
 			lastInCombatMs = System.currentTimeMillis();
 			lastCombatActivityMs = System.currentTimeMillis();
+			postCombatPauseUntilMs = 0L;
 		}
 		if (this.isAttackEnabled()) {
 			this.status = "Waiting";
@@ -1354,20 +1375,19 @@ public class ViruzFFABotScript extends Script
 
 	private Rs2PlayerModel closestPlayer(Predicate<Rs2PlayerModel> predicate) {
 		final WorldPoint localLoc = getLocalPlayerLocation();
-		return Rs2Player.getPlayers(predicate).min(Comparator.comparingDouble(p -> {
+		return getPlayers(predicate).min(Comparator.comparingDouble(p -> {
 			WorldPoint loc = p.getWorldLocation();
 			if (loc == null || localLoc == null) return Double.MAX_VALUE;
-			return (double) loc.distanceTo(localLoc);
+			return loc.distanceTo(localLoc);
 		})).orElse(null);
 	}
 
 	private boolean isPlayerOnScreen(Actor p) {
 		if (p == null || p.getWorldLocation() == null) return false;
-		Boolean visible = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			LocalPoint lp = LocalPoint.fromWorld(Microbot.getClient().getTopLevelWorldView(), p.getWorldLocation());
 			return lp != null && Rs2Camera.isTileOnScreen(lp);
 		}).orElse(Boolean.FALSE);
-		return visible != null && visible;
 	}
 
 	private Rs2PlayerModel findReportTarget() {
@@ -1420,8 +1440,8 @@ public class ViruzFFABotScript extends Script
 		net.runelite.api.Point clickPoint = Rs2UiHelper.getClickingPoint(clickbox, true);
 		Microbot.getMouse().click(clickPoint, true);
 		Global.sleep(60, 160);
-		Boolean invoked = Microbot.getClientThread().runOnClientThreadOptional(() -> {
-			MenuEntry[] entries = Microbot.getClient().getMenuEntries();
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
 			for (MenuEntry entry : entries) {
 				if (entry.getOption() == null || !entry.getOption().equalsIgnoreCase("Report")) continue;
 				NewMenuEntry nme = new NewMenuEntry(entry.getOption(), entry.getTarget(),
@@ -1431,19 +1451,17 @@ public class ViruzFFABotScript extends Script
 			}
 			return false;
 		}).orElse(false);
-		return invoked != null && invoked;
 	}
 
 	private boolean clickWidget(Widget widget) {
 		if (widget == null) return false;
-		Boolean clickable = Microbot.getClientThread().runOnClientThreadOptional(() -> {
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			if (widget.isHidden() || widget.getBounds() == null) return false;
 			Rectangle bounds = widget.getBounds();
 			if (bounds.width <= 0 || bounds.height <= 0) return false;
 			Microbot.getMouse().click(Rs2UiHelper.getClickingPoint(bounds, true));
 			return true;
 		}).orElse(false);
-		return clickable != null && clickable;
 	}
 
 	private final HumanBehavior humanBehavior = new HumanBehavior();
@@ -1452,7 +1470,7 @@ public class ViruzFFABotScript extends Script
 
 	private boolean microMissclick() { return humanBehavior.microMissclick(); }
 
-	private void occasionalMisclick(int areaWidth, int areaHeight, double fatigueFactor) { humanBehavior.occasionalMisclick(areaWidth, areaHeight, fatigueFactor); }
+	private void occasionalMisclick(double fatigueFactor) { humanBehavior.occasionalMisclick(200, 150, fatigueFactor); }
 
 	private Point applyNaturalClickVariation(Point target) { return humanBehavior.applyNaturalClickVariation(target); }
 
@@ -1466,7 +1484,7 @@ public class ViruzFFABotScript extends Script
 
 	private void onAction() { humanBehavior.onAction(); }
 
-	private boolean simulateHumanError(double errorRate) { return humanBehavior.simulateHumanError(errorRate); }
+	private boolean simulateHumanError() { return humanBehavior.simulateHumanError(0.02); }
 
 	private int getCurrentFatigueLevel() { return humanBehavior.getCurrentFatigueLevel(); }
 
@@ -1482,6 +1500,10 @@ public class ViruzFFABotScript extends Script
 
 	private void naturalIdle() { humanBehavior.naturalIdle(); }
 
+	private boolean shouldHesitate() { return humanBehavior.shouldHesitate(); }
+
+	private int addHesitationDelay() { return humanBehavior.addHesitationDelay(); }
+
 	private boolean isAttacking() { return this.isAttacking; }
 
 	private void setAttacking(boolean attacking) { this.isAttacking = attacking; }
@@ -1492,13 +1514,13 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean isPlayerMoving(Rs2PlayerModel playerModel) {
-		return playerModel != null && Rs2Player.isMoving(playerModel);
+		return Rs2Player.isMoving(playerModel);
 	}
 
 	private boolean playerExists(Actor actor) {
 		if (actor == null) return false;
 		if (actor instanceof Rs2PlayerModel) {
-			return ((Rs2PlayerModel) actor).getWorldLocation() != null;
+			return actor.getWorldLocation() != null;
 		}
 		return Microbot.getClientThread().runOnClientThreadOptional(() -> actor.getWorldLocation() != null).orElse(false);
 	}
@@ -1517,11 +1539,11 @@ public class ViruzFFABotScript extends Script
 		return local.getInteracting();
 	}
 
-	private boolean currentInteractableIs(String name) {
-		if (name == null) return false;
+	private boolean notInteractingWith(String name) {
+		if (name == null) return true;
 		Actor interacting = getInteractingWithMe();
-		return interacting != null && interacting.getName() != null
-				&& interacting.getName().toLowerCase(Locale.ROOT).trim().equals(name);
+		return interacting == null || interacting.getName() == null
+				|| !interacting.getName().toLowerCase(Locale.ROOT).trim().equals(name);
 	}
 
 	private int getAnimationOf(Actor actor) {
@@ -1533,13 +1555,12 @@ public class ViruzFFABotScript extends Script
 		Rectangle clickbox = getActorClickbox(actor);
 		if (clickbox == null) return null;
 		net.runelite.api.Point rp = Rs2UiHelper.getClickingPoint(clickbox, true);
-		if (rp == null) return null;
 		return new Point(rp.getX(), rp.getY());
 	}
 
-	private void mouseClick(Point point, boolean rightClick) {
+	private void mouseClick(Point point) {
 		if (point == null) return;
-		Microbot.getMouse().click(new net.runelite.api.Point(point.x, point.y), rightClick);
+		Microbot.getMouse().click(new net.runelite.api.Point(point.x, point.y), true);
 	}
 
 	private int getCameraYawDegrees() {
@@ -1589,22 +1610,19 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean isMenuVisible() {
-		Boolean visible = Microbot.getClientThread().runOnClientThreadOptional(() -> {
-			MenuEntry[] entries = Microbot.getClient().getMenuEntries();
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
 			return Microbot.getClient().isMenuOpen() && entries != null && entries.length > 0;
 		}).orElse(false);
-		return visible != null && visible;
 	}
 
-	private boolean clickMenuEntryByOption(String option) {
-		if (option == null) return false;
-		String lower = option.toLowerCase(Locale.ROOT).trim();
-		Boolean clicked = Microbot.getClientThread().runOnClientThreadOptional(() -> {
-			MenuEntry[] entries = Microbot.getClient().getMenuEntries();
+	private boolean clickMenuEntryByOption() {
+		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
+			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
 			if (entries == null) return false;
 			for (MenuEntry entry : entries) {
 				if (entry == null || entry.getOption() == null) continue;
-				if (!entry.getOption().toLowerCase(Locale.ROOT).trim().startsWith(lower)) continue;
+				if (!entry.getOption().toLowerCase(Locale.ROOT).trim().startsWith("attack")) continue;
 				NewMenuEntry nme = new NewMenuEntry(entry.getOption(), entry.getTarget(),
 						entry.getIdentifier(), entry.getType(), entry.getParam0(), entry.getParam1(), false);
 				Rectangle bounds = new Rectangle(0, 0,
@@ -1614,7 +1632,6 @@ public class ViruzFFABotScript extends Script
 			}
 			return false;
 		}).orElse(false);
-		return clicked != null && clicked;
 	}
 
 	private void attackingPlayer() {
@@ -1629,7 +1646,7 @@ public class ViruzFFABotScript extends Script
 		this.setAttacking(true);
 		try {
 			Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
-			if (localPlayer == null || !playerExists(localPlayer)) {
+			if (!playerExists(localPlayer)) {
 				this.status = "Local player not ready";
 				return;
 			}
@@ -1651,7 +1668,7 @@ public class ViruzFFABotScript extends Script
 			boolean localInSafeZone = this.SAFE_ZONE.contains(localTile);
 			targetCooldownUntilMs.entrySet().removeIf(e -> now >= e.getValue());
 
-			List<Rs2PlayerModel> candidateModels = Rs2Player.getPlayers(p ->
+			List<Rs2PlayerModel> candidateModels = getPlayers(p ->
 					this.isTargetValid(p, localPlayer, localName, localTile, localInSafeZone)
 							&& !isTargetOnCooldown(p.getName()))
 					.collect(Collectors.toList());
@@ -1756,6 +1773,12 @@ public class ViruzFFABotScript extends Script
 				this.sleepWithFatigue(80, 250);
 			}
 
+			if (this.shouldHesitate()) {
+				this.status = "Hesitating...";
+				int hesitation = this.addHesitationDelay();
+				this.sleepWithFatigue(Math.min(hesitation / 2, 400), hesitation);
+			}
+
 			if (ThreadLocalRandom.current().nextDouble() < 0.01 + fatigueFactor2 * 0.001) {
 				this.status = "Second glance";
 				Point tp = getClickablePoint(target);
@@ -1765,7 +1788,7 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 
-			occasionalMisclick(200, 150, fatigueFactor2 * 0.5);
+			occasionalMisclick(fatigueFactor2 * 0.5);
 
 			long attackReaction = getNaturalAttackDelay();
 			this.sleepWithFatigue((int) attackReaction, (int) (attackReaction + 80));
@@ -1822,7 +1845,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean rotateCameraToFace(Actor target) {
-		if (target == null || !playerExists(target)) return false;
+		if (!playerExists(target)) return false;
 		if (isPlayerOnScreen(target)) return true;
 		WorldPoint targetTile = target.getWorldLocation();
 		if (targetTile == null) return false;
@@ -1862,7 +1885,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void trackRepeatAttackerAutoNsList(Rs2PlayerModel localPlayer, long now) {
-		if (localPlayer == null || !isPlayerInCombat(localPlayer)) {
+		if (!isPlayerInCombat(localPlayer)) {
 			return;
 		}
 		Actor interacting = getInteractingWithMe();
@@ -1945,7 +1968,7 @@ public class ViruzFFABotScript extends Script
 		}
 		long fatigueR = System.currentTimeMillis() - fatigueStart;
 		double fatigueF = this.getFatigueFactor(fatigueR);
-		occasionalMisclick(200, 150, fatigueF * 0.5);
+			occasionalMisclick(fatigueF * 0.5);
 		Point clickPoint = getClickablePoint(target);
 		if (clickPoint == null) return false;
 		clickPoint = applyNaturalClickVariation(clickPoint);
@@ -1972,22 +1995,23 @@ public class ViruzFFABotScript extends Script
 			Microbot.getMouse().click();
 			return true;
 		}
-		mouseClick(clickPoint, true);
+		mouseClick(clickPoint);
 		Global.sleepUntil(this::isMenuVisible, 2000);
-		return clickMenuEntryByOption("Attack");
+		return clickMenuEntryByOption();
 	}
 
 	private Rs2PlayerModel findAttackerOfBluePhat(Rs2PlayerModel localPlayer) {
-		if (localPlayer == null || !playerExists(localPlayer) || this.bluePhatNames.isEmpty()) return null;
+		if (!playerExists(localPlayer) || this.bluePhatNames.isEmpty()) return null;
 		String localName = localPlayer.getName() != null ? localPlayer.getName().toLowerCase(Locale.ROOT).trim() : "";
 		WorldPoint localLoc = localPlayer.getWorldLocation();
 		if (localLoc == null) return null;
-		return Rs2Player.getPlayers(p -> p != null && p.getName() != null
+		return getPlayers(p -> p != null && p.getName() != null
 				&& !p.getName().toLowerCase(Locale.ROOT).trim().equals(localName)
 				&& p.getWorldLocation() != null
 				&& distanceBetween(localPlayer, p) <= MAX_TARGET_DISTANCE
 				&& this.IN_FFA.contains(p.getWorldLocation())
 				&& p.getInteracting() instanceof Player
+				&& p.getInteracting().getName() != null
 				&& this.bluePhatNames.contains(p.getInteracting().getName().toLowerCase(Locale.ROOT).trim()))
 				.min(Comparator.comparingDouble(p -> localLoc.distanceTo(p.getWorldLocation())))
 				.orElse(null);
@@ -2001,7 +2025,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean isStaffOfAirOnly(Rs2PlayerModel target) {
-		if (target == null || !playerExists(target)) return false;
+		if (!playerExists(target)) return false;
 		try {
 			Map<KitType, String> equipment = Rs2Player.getPlayerEquipmentNames(target);
 			if (equipment == null) return false;
@@ -2022,7 +2046,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void lureDragToSafe(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || !playerExists(target)) return;
+		if (localPlayer == null || !playerExists(target)) return;
 		String targetName = target.getName();
 		if (targetName == null) return;
 
@@ -2033,7 +2057,7 @@ public class ViruzFFABotScript extends Script
 		this.log("Luring lure bot " + targetName + " to safe zone");
 		sendDiscordEmbed("Luring lure bot to safe zone: " + targetName);
 
-		if (!isPlayerInCombat(localPlayer) || !currentInteractableIs(targetName.toLowerCase(Locale.ROOT).trim())) {
+		if (!isPlayerInCombat(localPlayer) || notInteractingWith(targetName.toLowerCase(Locale.ROOT).trim())) {
 			boolean attacked = rightClickInteract(target);
 			if (!attacked) return;
 			Global.sleepUntil(() -> isPlayerInCombat(Rs2Player.getLocalPlayer()), 3000);
@@ -2051,7 +2075,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void lureDragToHills(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || !playerExists(target)) return;
+		if (localPlayer == null || !playerExists(target)) return;
 		String targetName = target.getName();
 		if (targetName == null) return;
 
@@ -2059,7 +2083,7 @@ public class ViruzFFABotScript extends Script
 		this.log("Luring " + targetName + " to Hills");
 		sendDiscordEmbed("Luring to Hills: " + targetName);
 
-		if (!isPlayerInCombat(localPlayer) || !currentInteractableIs(targetName.toLowerCase(Locale.ROOT).trim())) {
+		if (!isPlayerInCombat(localPlayer) || notInteractingWith(targetName.toLowerCase(Locale.ROOT).trim())) {
 			boolean attacked = rightClickInteract(target);
 			if (!attacked) return;
 			Global.sleepUntil(() -> isPlayerInCombat(Rs2Player.getLocalPlayer()), 3000);
@@ -2084,7 +2108,7 @@ public class ViruzFFABotScript extends Script
 								  String localName,
 								  WorldPoint localTile,
 								  boolean localInSafeZone) {
-		if (player == null || !playerExists(player) || localPlayer == null || !playerExists(localPlayer) || localTile == null) {
+		if (!playerExists(player) || !playerExists(localPlayer) || localTile == null) {
 			return false;
 		}
 		String rawName = player.getName();
@@ -2170,7 +2194,7 @@ public class ViruzFFABotScript extends Script
 			if (Rs2Tab.switchTo(InterfaceTab.COMBAT)) {
 				this.sleepWithFatigue(200, 600);
 				Widget styleChild = Rs2Widget.getWidget(ATTACK_STYLE_WIDGET_PARENT, ATTACK_STYLE_CHILDS[attackStyleIndex]);
-				if (styleChild != null && clickWidget(styleChild)) {
+				if (clickWidget(styleChild)) {
 					this.log("Switched attack style to " + newSkill.name());
 					this.status = "Style: " + newSkill.name();
 				}
@@ -2181,7 +2205,6 @@ public class ViruzFFABotScript extends Script
 
 	private Skill getSkillForStyle(int index) {
 		switch (index) {
-			case 0: return Skill.ATTACK;
 			case 1: return Skill.STRENGTH;
 			case 2: return Skill.DEFENCE;
 			default: return Skill.ATTACK;
@@ -2276,29 +2299,6 @@ public class ViruzFFABotScript extends Script
 			}
 		} else if (Rs2Prayer.isPrayerActive(Rs2PrayerEnum.PROTECT_MAGIC) || Rs2Prayer.isPrayerActive(Rs2PrayerEnum.PROTECT_MELEE)) {
 			this.switchToProtectFromRanged();
-		}
-
-	}
-
-	private void checkPrayerOverhead() {
-		this.sleepWithFatigue(250, 1500);
-		Actor interacting = getInteractingWithMe();
-		Rs2PlayerModel target = interacting instanceof Player ? new Rs2PlayerModel((Player) interacting) : null;
-		if (target != null) {
-			HeadIcon overhead = target.getOverheadIcon();
-			if (overhead != null) {
-				switch (overhead) {
-					case MAGIC:
-						this.switchToRangedArmour();
-						break;
-					case RANGED:
-					case MELEE:
-						this.switchToMeleeArmour();
-						break;
-					default:
-						this.log("Unknown overhead icon");
-				}
-			}
 		}
 
 	}
@@ -2411,29 +2411,6 @@ public class ViruzFFABotScript extends Script
 				this.sleepWithFatigue(200, 800);
 				Rs2Prayer.toggle(mistaken, false);
 				this.sleepWithFatigue(100, 400);
-			}
-		}
-	}
-
-	private void switchToMeleeArmour() {
-		this.equipFirst(MELEE_WEAPONS, "Wield");
-		this.equipFirst(MELEE_SHIELDS, "Wear");
-		this.equipFirst(MELEE_BODY, "Wear");
-		this.equipFirst(MELEE_LEGS, "Wear");
-	}
-
-	private void switchToRangedArmour() {
-		this.equipFirst(RANGED_WEAPONS, "Wield");
-		this.equipFirst(RANGED_BODY, "Wear");
-		this.equipFirst(RANGED_CHAPS, "Wear");
-	}
-
-	private void equipFirst(String[] items, String action) {
-		for (String item : items) {
-			Rs2ItemModel equipped = Rs2Inventory.get(item, true);
-			if (equipped != null) {
-				Rs2Inventory.interact(equipped, action);
-				return;
 			}
 		}
 	}
@@ -2735,7 +2712,7 @@ public class ViruzFFABotScript extends Script
 		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		if (local == null) return;
 		String localName = local.getName() == null ? "" : local.getName();
-		List<Rs2PlayerModel> players = Rs2Player.getPlayers(p -> p != null && p.getName() != null
+		List<Rs2PlayerModel> players = getPlayers(p -> p != null && p.getName() != null
 				&& !p.getName().equalsIgnoreCase(localName)
 				&& p.getWorldLocation() != null
 				&& distanceBetween(local, p) < 10)
@@ -2758,18 +2735,20 @@ public class ViruzFFABotScript extends Script
 		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		WorldPoint localTile = local == null ? null : local.getWorldLocation();
 		if (localTile == null) return;
-		net.runelite.api.GameObject obj = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> o != null && o.getWorldLocation() != null
-				&& Math.hypot(o.getWorldLocation().getX() - localTile.getX(),
-				o.getWorldLocation().getY() - localTile.getY()) < 5);
+		Rs2TileObjectModel obj = Microbot.getRs2TileObjectCache().query()
+				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
+				.where(o -> Math.hypot(o.getWorldLocation().getX() - localTile.getX(),
+						o.getWorldLocation().getY() - localTile.getY()) < 5)
+				.first();
 		if (obj != null) {
-			net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(obj, "Examine");
+			obj.click("Examine");
 			this.sleepWithFatigue(300, 1000);
 		}
 	}
 
 	private void performAntiban() {
 		this.onAction();
-		if (this.simulateHumanError(0.02)) {
+		if (this.simulateHumanError()) {
 			this.status = "Mistake...";
 			Microbot.naturalMouse.moveOffScreen();
 			Global.sleep(1000 + ThreadLocalRandom.current().nextInt(3000));
@@ -2943,7 +2922,7 @@ public class ViruzFFABotScript extends Script
 
 				this.status = "Trackers Scan: walking to " + areaName;
 				Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
-				if (localPlayer == null || !playerExists(localPlayer)) {
+				if (!playerExists(localPlayer)) {
 					this.log("Trackers Scan: local player not ready");
 					return;
 				}
@@ -2952,7 +2931,7 @@ public class ViruzFFABotScript extends Script
 				int maxAttempts = 10;
 				for (int attempt = 0; attempt < maxAttempts; attempt++) {
 					localPlayer = Rs2Player.getLocalPlayer();
-					if (localPlayer == null || !playerExists(localPlayer)) break;
+					if (!playerExists(localPlayer)) break;
 					if (localPlayer.getWorldLocation() != null && destArea.contains(localPlayer.getWorldLocation())) break;
 					long fatigueR = System.currentTimeMillis() - fatigueStart;
 					double fatigueF = this.getFatigueFactor(fatigueR);
@@ -2961,7 +2940,7 @@ public class ViruzFFABotScript extends Script
 				}
 
 				localPlayer = Rs2Player.getLocalPlayer();
-				if (localPlayer != null && playerExists(localPlayer)
+				if (playerExists(localPlayer)
 						&& localPlayer.getWorldLocation() != null && destArea.contains(localPlayer.getWorldLocation())) {
 					this.status = "Trackers Scan: scanning at " + areaName;
 					this.log("Trackers Scan: performing full tracker scan/save at " + areaName);
@@ -2977,7 +2956,7 @@ public class ViruzFFABotScript extends Script
 			}
 
 			Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
-			if (localPlayer != null && playerExists(localPlayer)) {
+			if (playerExists(localPlayer)) {
 				this.status = "Trackers Scan: updating tracker info";
 				this.log("Trackers Scan: updating all tracker info for GUI");
 				this.readMainUserFile();
@@ -3380,14 +3359,17 @@ public class ViruzFFABotScript extends Script
 
 	private void examineGroundDecoration() {
 		this.status = "Examining ground";
-		net.runelite.api.GameObject deco = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> {
-			if (o == null || o.getWorldLocation() == null) return false;
-			String n = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getCompositionName(o).orElse(null);
-			return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
-		}, 6);
+		Rs2TileObjectModel deco = Microbot.getRs2TileObjectCache().query()
+				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
+				.where(o -> {
+					String n = tileObjectName(o);
+					return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
+				})
+				.within(6)
+				.first();
 		if (deco == null) return;
-		if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(deco, "Examine")) {
-			net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(deco, "Examine");
+		if (tileObjectHasAction(deco, "Examine")) {
+			deco.click("Examine");
 			Global.sleep(Rs2Random.between(400, 1100));
 		} else {
 			Point p = getClickablePointForObject(deco);
@@ -3445,14 +3427,14 @@ public class ViruzFFABotScript extends Script
 		if (loc == null) return;
 		if (loc.getPlane() == 1) {
 			this.log("Player is on an upper level (Z=1). Searching for climbable object...");
-			net.runelite.api.GameObject climbableObject = this.findClimbableObject();
+			Rs2TileObjectModel climbableObject = this.findClimbableObject();
 			if (climbableObject != null) {
-				String objName = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getCompositionName(climbableObject).orElse(null);
+				String objName = tileObjectName(climbableObject);
 				this.log("Found climbable object: " + objName + " at " + climbableObject.getWorldLocation());
-				String climbOption = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(climbableObject, "Climb-down") ? "Climb-down" : this.getFallbackClimbOption(climbableObject);
+				String climbOption = tileObjectHasAction(climbableObject, "Climb-down") ? "Climb-down" : this.getFallbackClimbOption(climbableObject);
 				if (climbOption != null) {
 					this.log("Using action: " + climbOption + " on " + objName);
-					if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.interact(climbableObject, climbOption)) {
+					if (climbableObject.click(climbOption)) {
 						Global.sleepUntil(() -> {
 							Rs2PlayerModel p = Rs2Player.getLocalPlayer();
 							WorldPoint w = p == null ? null : p.getWorldLocation();
@@ -3476,20 +3458,26 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private net.runelite.api.GameObject findClimbableObject() {
+	private Rs2TileObjectModel findClimbableObject() {
 		String[] names = {"Stairs", "Ladder", "Staircase", "Spiral staircase", "Trapdoor"};
 		for (String name : names) {
-			net.runelite.api.GameObject obj = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(name, true);
+			Rs2TileObjectModel obj = Microbot.getRs2TileObjectCache().query()
+					.where(o -> o.getTileObjectType() == TileObjectType.GAME)
+					.withName(name)
+					.first();
 			if (obj != null) {
 				return obj;
 			}
 		}
-		return net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(o -> net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-down"));
+		return Microbot.getRs2TileObjectCache().query()
+				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
+				.where(o -> tileObjectHasAction(o, "Climb-down"))
+				.first();
 	}
 
-	private String getFallbackClimbOption(net.runelite.api.GameObject gameObject) {
+	private String getFallbackClimbOption(Rs2TileObjectModel gameObject) {
 		for (String action : new String[]{"Climb Down", "Climb", "Go-down"}) {
-			if (net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(gameObject, action)) {
+			if (tileObjectHasAction(gameObject, action)) {
 				return action;
 			}
 		}
@@ -3497,13 +3485,16 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void avoidObstacles() {
-		net.runelite.api.GameObject obstacle = net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.getGameObject(
-				o -> net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-up") || net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject.hasAction(o, "Climb-down"), 8);
+		Rs2TileObjectModel obstacle = Microbot.getRs2TileObjectCache().query()
+				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
+				.where(o -> tileObjectHasAction(o, "Climb-up") || tileObjectHasAction(o, "Climb-down"))
+				.within(8)
+				.first();
 		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
 		if (obstacle == null || localPlayer == null) return;
 		WorldPoint lt = localPlayer.getWorldLocation();
 		WorldPoint ot = obstacle.getWorldLocation();
-		if (lt != null && ot != null && lt.distanceTo(ot) < 8) {
+		if (lt != null && lt.distanceTo(ot) < 8) {
 			this.log("Avoiding climbing obstacle");
 			Rs2Walker.walkTo(lt.dx(Rs2Random.between(-2, 2)).dy(Rs2Random.between(-2, 2)));
 			Global.sleep(Rs2Random.between(2000, 3000));
@@ -3514,10 +3505,12 @@ public class ViruzFFABotScript extends Script
 		if (localPlayer == null || localPlayer.getName() == null) return;
 		String localName = localPlayer.getName().toLowerCase(Locale.ROOT).trim();
 		String location = getLocationContext(localPlayer);
-		List<Rs2PlayerModel> allPlayers = Rs2Player.getPlayers(p -> p != null && p.getName() != null)
+		List<Rs2PlayerModel> allPlayers = getPlayers(p -> p != null && p.getName() != null)
 				.collect(Collectors.toList());
 		for (Rs2PlayerModel p : allPlayers) {
-			String name = p.getName().toLowerCase(Locale.ROOT).trim();
+			String playerName = p.getName();
+			if (playerName == null) continue;
+			String name = playerName.toLowerCase(Locale.ROOT).trim();
 			if (name.equals(localName)) continue;
 			nonTargetTracker.record(p, location);
 		}
@@ -3934,6 +3927,30 @@ public class ViruzFFABotScript extends Script
 		return new Point(b.x + b.width / 2, b.y + b.height / 2);
 	}
 
+	private static Stream<Rs2PlayerModel> getPlayers(Predicate<Rs2PlayerModel> predicate) {
+		final Player localPlayer = Microbot.getClient().getLocalPlayer();
+		return Microbot.getRs2PlayerCache().getStream()
+				.map(p -> new Rs2PlayerModel(p.getPlayer()))
+				.filter(p -> p.getPlayer() != localPlayer)
+				.filter(predicate);
+	}
+
+	private static boolean tileObjectHasAction(Rs2TileObjectModel obj, String action) {
+		if (obj == null || action == null) return false;
+		final ObjectComposition comp = obj.getObjectComposition();
+		if (comp == null || comp.getActions() == null) return false;
+		final String needle = action.toLowerCase(Locale.ROOT);
+		return Arrays.stream(comp.getActions()).filter(Objects::nonNull)
+				.anyMatch(a -> a.toLowerCase(Locale.ROOT).contains(needle));
+	}
+
+	private static String tileObjectName(Rs2TileObjectModel obj) {
+		if (obj == null) return null;
+		final String name = obj.getName();
+		if (name == null || name.equals("null")) return null;
+		return name;
+	}
+
 	private void ensureAutoRetaliateOff() {
 		if (autoRetaliateOffVerified) return;
 		try {
@@ -4016,10 +4033,10 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void handleAttackerRetaliation(Rs2PlayerModel localPlayer) {
-		if (localPlayer == null || !playerExists(localPlayer)) return;
+		if (!playerExists(localPlayer)) return;
 		if (this.isAttacking()) return;
 		Player attacker = getCharacterInteractingWithMe();
-		if (attacker == null || !playerExists(attacker) || attacker.getName() == null) return;
+		if (!playerExists(attacker) || attacker.getName() == null) return;
 		String attackerKey = attacker.getName().toLowerCase(Locale.ROOT).trim();
 
 		WorldPoint localTile = localPlayer.getWorldLocation();
@@ -4094,7 +4111,7 @@ public class ViruzFFABotScript extends Script
 		if (local == null) return null;
 		Player localPlayer = local.getPlayer();
 		if (localPlayer == null) return null;
-		return Rs2Player.getPlayers(p -> p != null && p != local
+		return getPlayers(p -> p != null && p != local
 				&& p.getInteracting() instanceof Player
 				&& p.getInteracting() == localPlayer).findFirst().orElse(null);
 	}
@@ -4105,70 +4122,6 @@ public class ViruzFFABotScript extends Script
 
 	public long getSessionDurationMinutes() {
 		return humanBehavior.getSessionDurationMinutes();
-	}
-
-	public boolean isAttackEnabled() {
-		return attackEnabled;
-	}
-
-	public void setAttackEnabled(boolean attackEnabled) {
-		this.attackEnabled = attackEnabled;
-	}
-
-	public boolean isWalkToTargetEnabled() {
-		return walkToTargetEnabled;
-	}
-
-	public void setWalkToTargetEnabled(boolean walkToTargetEnabled) {
-		this.walkToTargetEnabled = walkToTargetEnabled;
-	}
-
-	public boolean isQuickprayersEnabled() {
-		return quickprayersEnabled;
-	}
-
-	public void setQuickprayersEnabled(boolean quickprayersEnabled) {
-		this.quickprayersEnabled = quickprayersEnabled;
-	}
-
-	public boolean isPrayerOffEnabled() {
-		return prayerOffEnabled;
-	}
-
-	public void setPrayerOffEnabled(boolean prayerOffEnabled) {
-		this.prayerOffEnabled = prayerOffEnabled;
-	}
-
-	public boolean isSwitchPrayersEnabled() {
-		return switchPrayersEnabled;
-	}
-
-	public void setSwitchPrayersEnabled(boolean switchPrayersEnabled) {
-		this.switchPrayersEnabled = switchPrayersEnabled;
-	}
-
-	public boolean isFreeRoamEnabled() {
-		return freeRoamEnabled;
-	}
-
-	public void setFreeRoamEnabled(boolean freeRoamEnabled) {
-		this.freeRoamEnabled = freeRoamEnabled;
-	}
-
-	public boolean isProtectBluePhatsEnabled() {
-		return protectBluePhatsEnabled;
-	}
-
-	public void setProtectBluePhatsEnabled(boolean protectBluePhatsEnabled) {
-		this.protectBluePhatsEnabled = protectBluePhatsEnabled;
-	}
-
-	public boolean isReportEnabled() {
-		return reportEnabled;
-	}
-
-	public void setReportEnabled(boolean reportEnabled) {
-		this.reportEnabled = reportEnabled;
 	}
 
 	public void onPaint(Graphics g) {
@@ -4182,7 +4135,7 @@ public class ViruzFFABotScript extends Script
 			g.drawRect(this.guiToggleButton.x, this.guiToggleButton.y, this.guiToggleButton.width, this.guiToggleButton.height);
 			g.setColor(Color.WHITE);
 			g.setFont(new Font("Arial", Font.BOLD, 14));
-			g.drawString("\u25B6", this.guiToggleButton.x + 10, this.guiToggleButton.y + 21);
+			g.drawString("▶", this.guiToggleButton.x + 10, this.guiToggleButton.y + 21);
 			return;
 		}
 		int width = 260;
@@ -4206,7 +4159,7 @@ public class ViruzFFABotScript extends Script
 		g.drawRect(this.hideGuiButton.x, this.hideGuiButton.y, this.hideGuiButton.width, this.hideGuiButton.height);
 		g.setColor(Color.WHITE);
 		g.setFont(new Font("Arial", Font.BOLD, 12));
-		g.drawString("\u00D7", this.hideGuiButton.x + 6, this.hideGuiButton.y + 15);
+		g.drawString("×", this.hideGuiButton.x + 6, this.hideGuiButton.y + 15);
 
 		g.setFont(new Font("Arial", Font.PLAIN, 12));
 		this.drawCheckbox(g, this.attackBox, "Attack", this.isAttackEnabled());
@@ -4273,17 +4226,15 @@ public class ViruzFFABotScript extends Script
 		if (!aiAssistant.getPlayerProfiles().isEmpty()) {
 			java.util.Optional<Map.Entry<String, AIAssistant.PlayerProfile>> topThreat = aiAssistant.getPlayerProfiles().entrySet().stream()
 					.max(java.util.Comparator.comparingDouble(e -> e.getValue().threatDisplay()));
-			if (topThreat.isPresent()) {
-				double threat = topThreat.get().getValue().threatDisplay();
-				Color threatColor = threat >= 5.0 ? new Color(255, 70, 70) :
-						threat >= 3.0 ? new Color(255, 165, 50) :
-								threat >= 1.0 ? new Color(255, 220, 80) :
-										new Color(100, 220, 100);
-				g.setColor(threatColor);
-				String topStr = String.format("Top: %s [%.2f]", topThreat.get().getKey(), threat);
-				g.drawString(fitText(g, topStr, width - 15), 10, line);
-			}
-		} else {
+            double threat = topThreat.get().getValue().threatDisplay();
+            Color threatColor = threat >= 5.0 ? new Color(255, 70, 70) :
+                    threat >= 3.0 ? new Color(255, 165, 50) :
+                            threat >= 1.0 ? new Color(255, 220, 80) :
+                                    new Color(100, 220, 100);
+            g.setColor(threatColor);
+            String topStr = String.format("Top: %s [%.2f]", topThreat.get().getKey(), threat);
+            g.drawString(fitText(g, topStr, width - 15), 10, line);
+        } else {
 			g.setColor(new Color(120, 120, 120));
 			g.drawString("No data yet", 10, line);
 		}
@@ -4339,9 +4290,12 @@ public class ViruzFFABotScript extends Script
 		g.drawString("Tracked: " + nonTargetTracker.getTrackedCount() + " players", statsPaneX, nttY + 30);
 		Map<String, NonTargetTracker.LastSeenEntry> nttEntries = nonTargetTracker.getEntries();
 		if (!nttEntries.isEmpty()) {
-			NonTargetTracker.LastSeenEntry last = nttEntries.values().stream()
-					.max(Comparator.comparingLong(NonTargetTracker.LastSeenEntry::getLastSeenMs))
-					.orElse(null);
+			NonTargetTracker.LastSeenEntry last = null;
+			for (NonTargetTracker.LastSeenEntry candidate : nttEntries.values()) {
+				if (last == null || candidate.getLastSeenMs() > last.getLastSeenMs()) {
+					last = candidate;
+				}
+			}
 			if (last != null) {
 				String lastStr = String.format("Last: %s @%s (%d,%d,%d) cb=%d",
 						last.getPlayerName(), last.getLocation(),
@@ -4385,7 +4339,7 @@ public class ViruzFFABotScript extends Script
 		g.setColor(new Color(200, 220, 255));
 		g.drawString("Runtime: " + playerStats.getRuntimeString(), statsPaneX, psY + 30);
 		g.setColor(new Color(180, 200, 255));
-		g.drawString(fitText(g, "Current Runtime: " + this.timer2.formatTime(), statsWidth - 10), statsPaneX, psY + 42);
+		g.drawString(fitText(g, "Current Runtime: " + playerStats.getCurrentRuntimeString(), statsWidth - 10), statsPaneX, psY + 42);
 		g.setColor(new Color(130, 200, 130));
 		g.drawString("XP Earned: " + playerStats.getTotalXpEarned(), statsPaneX, psY + 54);
 		List<Map.Entry<String, Integer>> bullied = playerStats.getTopBullied(5);
@@ -4443,7 +4397,7 @@ public class ViruzFFABotScript extends Script
 		g.drawString(this.selectedLocation, this.locationComboBox.x + 5, this.locationComboBox.y + 15);
 		int arrowX = this.locationComboBox.x + this.locationComboBox.width - 15;
 		int arrowY = this.locationComboBox.y + 15;
-		g.drawString(this.comboBoxExpanded ? "\u25B2" : "\u25BC", arrowX, arrowY);
+		g.drawString(this.comboBoxExpanded ? "▲" : "▼", arrowX, arrowY);
 		if (this.comboBoxExpanded) {
 			for (int i = 0; i < this.locationOptions.size(); ++i) {
 				int optionY = this.locationComboBox.y + (i + 1) * 20;
@@ -4461,17 +4415,5 @@ public class ViruzFFABotScript extends Script
 				g.drawString(location, this.locationComboBox.x + 5, optionY + 15);
 			}
 		}
-	}
-
-	public void mousePressed(MouseEvent e) {
-	}
-
-	public void mouseReleased(MouseEvent e) {
-	}
-
-	public void mouseEntered(MouseEvent e) {
-	}
-
-	public void mouseExited(MouseEvent e) {
 	}
 }

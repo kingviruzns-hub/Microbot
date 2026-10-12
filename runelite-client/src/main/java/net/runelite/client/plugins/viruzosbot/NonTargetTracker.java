@@ -5,6 +5,9 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import static java.nio.file.Paths.get;
 
 public class NonTargetTracker {
@@ -13,6 +16,7 @@ public class NonTargetTracker {
     private long nextSaveMs = 0L;
     private static final long SAVE_INTERVAL_MS = 5_000L;
 
+    @Getter
     public static class LastSeenEntry {
         private String playerName;
         private int x;
@@ -21,6 +25,7 @@ public class NonTargetTracker {
         private long lastSeenMs;
         private String location;
         private int combatLevel;
+        @Setter
         private String status;
 
         @SuppressWarnings("unused")
@@ -35,16 +40,6 @@ public class NonTargetTracker {
             this.location = location;
             this.combatLevel = combatLevel;
         }
-
-        public String getPlayerName() { return playerName; }
-        public int getX() { return x; }
-        public int getY() { return y; }
-        public int getZ() { return z; }
-        public long getLastSeenMs() { return lastSeenMs; }
-        public String getLocation() { return location; }
-        public int getCombatLevel() { return combatLevel; }
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
     }
 
     public NonTargetTracker() {
@@ -81,7 +76,9 @@ public class NonTargetTracker {
     private static boolean exists(net.runelite.api.Player player) {
         return net.runelite.client.plugins.microbot.Microbot.getClientThread().runOnClientThreadOptional(() -> {
             net.runelite.api.Client client = net.runelite.client.plugins.microbot.Microbot.getClient();
-            return client.getLocalPlayer() != null && client.getPlayers().contains(player);
+            net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
+            return client.getLocalPlayer() != null && worldView != null
+                    && worldView.players().stream().anyMatch(p -> p == player);
         }).orElse(false);
     }
 
