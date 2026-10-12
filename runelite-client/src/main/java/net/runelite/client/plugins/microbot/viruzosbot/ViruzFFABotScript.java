@@ -42,9 +42,6 @@ import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.io.BufferedWriter;
@@ -79,7 +76,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	private static final String VERSION = "1.0.0";
+	static final String VERSION = "1.0.0";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -97,27 +94,27 @@ public class ViruzFFABotScript extends Script
 	private static final String RUNE_ARROW = "Rune arrow";
 	private static final String ADAMANT_ARROW = "Adamant arrow";
 	private static final String MITHRIL_ARROW = "Mithril arrow";
-	private final Rectangle attackBox = new Rectangle(10, 70, 14, 14);
-	private final Rectangle walkToTargetBox = new Rectangle(10, 90, 14, 14);
-	private final Rectangle quickprayerBox = new Rectangle(10, 110, 14, 14);
-	private final Rectangle prayerOffBox = new Rectangle(10, 130, 14, 14);
-	private final Rectangle switchPrayersBox = new Rectangle(10, 150, 14, 14);
-	private final Rectangle freeRoamBox = new Rectangle(10, 170, 14, 14);
-	private final Rectangle protectBluePhatsBox = new Rectangle(10, 190, 14, 14);
-	private final Rectangle reportBox = new Rectangle(10, 210, 14, 14);
-	private final Rectangle chatGrabberBox = new Rectangle(10, 230, 14, 14);
-	private final Rectangle focusPlayersBox = new Rectangle(10, 250, 14, 14);
-	private final Rectangle lureMultiBox = new Rectangle(10, 270, 14, 14);
-	private final Rectangle scanHillsBox = new Rectangle(10, 290, 14, 14);
-	private final Rectangle noDragBox = new Rectangle(10, 310, 14, 14);
-	private final Rectangle unlistBox = new Rectangle(10, 330, 14, 14);
-	private final Rectangle whitelistBox = new Rectangle(10, 350, 14, 14);
-	private final Rectangle purgeListButton = new Rectangle(12, 0, 85, 16);
-	private final Rectangle reEnergizeButton = new Rectangle(102, 0, 85, 16);
-	private final Rectangle locationComboBox = new Rectangle(10, 40, 110, 20);
-	private final Rectangle hideGuiButton = new Rectangle(236, 4, 20, 20);
-	private final Rectangle guiToggleButton = new Rectangle(0, 0, 30, 30);
-	private boolean guiHidden = false;
+	final Rectangle attackBox = new Rectangle(10, 70, 14, 14);
+	final Rectangle walkToTargetBox = new Rectangle(10, 90, 14, 14);
+	final Rectangle quickprayerBox = new Rectangle(10, 110, 14, 14);
+	final Rectangle prayerOffBox = new Rectangle(10, 130, 14, 14);
+	final Rectangle switchPrayersBox = new Rectangle(10, 150, 14, 14);
+	final Rectangle freeRoamBox = new Rectangle(10, 170, 14, 14);
+	final Rectangle protectBluePhatsBox = new Rectangle(10, 190, 14, 14);
+	final Rectangle reportBox = new Rectangle(10, 210, 14, 14);
+	final Rectangle chatGrabberBox = new Rectangle(10, 230, 14, 14);
+	final Rectangle focusPlayersBox = new Rectangle(10, 250, 14, 14);
+	final Rectangle lureMultiBox = new Rectangle(10, 270, 14, 14);
+	final Rectangle scanHillsBox = new Rectangle(10, 290, 14, 14);
+	final Rectangle noDragBox = new Rectangle(10, 310, 14, 14);
+	final Rectangle unlistBox = new Rectangle(10, 330, 14, 14);
+	final Rectangle whitelistBox = new Rectangle(10, 350, 14, 14);
+	final Rectangle purgeListButton = new Rectangle(12, 0, 85, 16);
+	final Rectangle reEnergizeButton = new Rectangle(102, 0, 85, 16);
+	final Rectangle locationComboBox = new Rectangle(10, 40, 110, 20);
+	final Rectangle hideGuiButton = new Rectangle(236, 4, 20, 20);
+	final Rectangle guiToggleButton = new Rectangle(0, 0, 30, 30);
+	boolean guiHidden = false;
 	private final WorldArea AT_LOBBY = new WorldArea(3128, 3625, 11, 11, 0);
 	private final WorldArea SAFE_ZONE = new WorldArea(3318, 4748, 21, 12, 0);
 	private final WorldArea IN_FFA = new WorldArea(3274, 4760, 106, 94, 0);
@@ -154,7 +151,7 @@ public class ViruzFFABotScript extends Script
 	@Getter
 	@Setter
 	private boolean reportEnabled = false;
-	private boolean comboBoxExpanded = false;
+	boolean comboBoxExpanded = false;
 	private int antiLureScan = 0;
 	private int ffaScanMisses = 0;
 	private int antiLureFails = 0;
@@ -162,23 +159,23 @@ public class ViruzFFABotScript extends Script
 	private volatile String lastKnownPlayerName = "";
 	private final AtomicBoolean sessionInitialized = new AtomicBoolean(false);
 	private volatile boolean sessionAnnounced = false;
-	private String selectedLocation = "None selected";
+	String selectedLocation = "None selected";
 	private int currentThreshold = getRandomThreshold();
 	private WorldArea currentArea = null;
 	private long lastSelectedLocationWalkFinishedAtMs = 0L;
-	private Timer timer2;
+	Timer timer2;
 	private final Timer arrowCheckTimer = new Timer(0L);
 	private boolean isAttacking = false;
 	private Set<String> attackSet = new HashSet<>();
 	private final Set<String> clanMembers = new HashSet<>();
 	private final Set<String> lureDragSet = new HashSet<>();
 	private long nextActionTime;
-	private long fatigueStart = System.currentTimeMillis();
+	long fatigueStart = System.currentTimeMillis();
 	private int actionsSinceBreak = 0;
 	private double ultradianPhase = 0.0;
-	private long fatigueSpikeEndTime = 0L;
+	long fatigueSpikeEndTime = 0L;
 	private double fatigueSpikeMagnitude = 0.0;
-	private long performanceStreakEndTime = 0L;
+	long performanceStreakEndTime = 0L;
 	private double performanceStreakBoost = 0.0;
 	private boolean forcedBreakPending = false;
 	private long nextFatigueCheck = System.currentTimeMillis() + 60000;
@@ -193,7 +190,7 @@ public class ViruzFFABotScript extends Script
 	private final Set<String> targets = new HashSet<>();
 	private final Set<String> bluePhatNames = new HashSet<>();
 	private final Map<String, WorldArea> areaMap = new HashMap<>();
-	private final List<String> locationOptions = Arrays.asList("None selected", "Portal", "Hills single", "Lava single", "Pond single", "Middle", "Hills", "Pond", "Lava");
+	final List<String> locationOptions = Arrays.asList("None selected", "Portal", "Hills single", "Lava single", "Pond single", "Middle", "Hills", "Pond", "Lava");
 	private static final Set<Integer> MAGIC_ATTACK_ANIMATIONS = Set.of(1162, 1163, 1164, 1165, 1978, 1979);
 	private long nextAfkBreakTime = System.currentTimeMillis() + Rs2Random.between(1800000, 3600000);
 	private static final Set<Integer> RANGE_ATTACK_ANIMATIONS = Set.of(426, 4230, 929);
@@ -201,14 +198,14 @@ public class ViruzFFABotScript extends Script
 	private static final String[] MELEE_WEAPONS = new String[]{"Rune scimitar", "Rune sword", "Rune longsword", "Rune axe", "Rune pickaxe", "Rune mace", "Rune warhammer", "Rune battleaxe", "Rune dagger", "Gilded scimitar", "Gilded spade", "Gilded pickaxe", "Gilded axe"};
 
 	private static final long CHAT_GRAB_COOLDOWN_MS = 2500L;
-	private final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
-	private boolean focusPlayersEnabled = false;
-	private boolean lureMultiEnabled = false;
+	final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
+	boolean focusPlayersEnabled = false;
+	boolean lureMultiEnabled = false;
 	private boolean hillScanActive = false;
-	private boolean hillScanEnabled = false;
-	private boolean noDragEnabled = false;
-	private boolean unlistEnabled = false;
-	private boolean whitelistEnabled = false;
+	boolean hillScanEnabled = false;
+	boolean noDragEnabled = false;
+	boolean unlistEnabled = false;
+	boolean whitelistEnabled = false;
 	private final Set<String> focusPlayerNames = new HashSet<>();
 	private final Map<String, Long> lastGrabbedBySender = new HashMap<>();
 	private long nextReportAttemptAtMs = 0L;
@@ -227,7 +224,7 @@ public class ViruzFFABotScript extends Script
 	private long nextRandomEventCheckMs = 0L;
 	private static final long RANDOM_EVENT_CHECK_INTERVAL_MS = 5_000L;
 	private long nextAttackListReloadAtMs = 0L;
-	private double energyBoost = 0.0;
+	double energyBoost = 0.0;
 	private long lastEnergyBoostTime = System.currentTimeMillis();
 	private long nextEnergyBoostCheck = System.currentTimeMillis() + 60000;
 	private long lastAttackAttemptAtMs = 0L;
@@ -245,10 +242,10 @@ public class ViruzFFABotScript extends Script
 	private long forcedBreakUntilMs = 0L;
 	private long lastForcedBreakMs = 0L;
 	private long nextAntiBanAtMs = 0L;
-	private final AIAssistant aiAssistant = new AIAssistant();
-	private final SessionTracker sessionTracker = new SessionTracker();
-	private final NonTargetTracker nonTargetTracker = new NonTargetTracker();
-	private final PlayerStats playerStats = new PlayerStats();
+	final AIAssistant aiAssistant = new AIAssistant();
+	final SessionTracker sessionTracker = new SessionTracker();
+	final NonTargetTracker nonTargetTracker = new NonTargetTracker();
+	final PlayerStats playerStats = new PlayerStats();
 	private long nextNonTargetScanMs = 0L;
 	private long noValidTargetCooldownUntilMs = 0L;
 
@@ -3188,7 +3185,7 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private double getFatigueFactor(long runtime) {
+	double getFatigueFactor(long runtime) {
 		if (runtime <= 0) return 0.0;
 		double hours = (double) runtime / 3600000.0;
 		long now = System.currentTimeMillis();
@@ -4155,298 +4152,5 @@ public class ViruzFFABotScript extends Script
 
 	public long getSessionDurationMinutes() {
 		return humanBehavior.getSessionDurationMinutes();
-	}
-
-	public void onPaint(Graphics g) {
-		if (this.timer2 == null || this.selectedLocation == null || this.status == null) {
-			return;
-		}
-		if (this.guiHidden) {
-			g.setColor(new Color(20, 20, 20, 200));
-			g.fillRect(this.guiToggleButton.x, this.guiToggleButton.y, this.guiToggleButton.width, this.guiToggleButton.height);
-			g.setColor(new Color(26, 180, 250));
-			g.drawRect(this.guiToggleButton.x, this.guiToggleButton.y, this.guiToggleButton.width, this.guiToggleButton.height);
-			g.setColor(Color.WHITE);
-			g.setFont(new Font("Arial", Font.BOLD, 14));
-			g.drawString("▶", this.guiToggleButton.x + 10, this.guiToggleButton.y + 21);
-			return;
-		}
-		int width = 260;
-		int statsPaneX = width + 5;
-		int height = 540;
-
-		g.setColor(new Color(20, 20, 20, 200));
-		g.fillRect(0, 0, width, height);
-		g.setColor(new Color(26, 180, 250));
-		g.drawRect(0, 0, width - 1, height - 1);
-
-		g.setColor(new Color(26, 180, 250, 50));
-		g.fillRect(0, 0, width, 30);
-		g.setColor(Color.WHITE);
-		g.setFont(new Font("Arial", Font.BOLD, 16));
-		g.drawString("ViruzFFABot", 65, 22);
-
-		g.setColor(new Color(40, 40, 40));
-		g.fillRect(this.hideGuiButton.x, this.hideGuiButton.y, this.hideGuiButton.width, this.hideGuiButton.height);
-		g.setColor(new Color(26, 180, 250));
-		g.drawRect(this.hideGuiButton.x, this.hideGuiButton.y, this.hideGuiButton.width, this.hideGuiButton.height);
-		g.setColor(Color.WHITE);
-		g.setFont(new Font("Arial", Font.BOLD, 12));
-		g.drawString("×", this.hideGuiButton.x + 6, this.hideGuiButton.y + 15);
-
-		g.setFont(new Font("Arial", Font.PLAIN, 12));
-		this.drawCheckbox(g, this.attackBox, "Attack", this.isAttackEnabled());
-		this.drawCheckbox(g, this.walkToTargetBox, "Walk to target", this.isWalkToTargetEnabled());
-		this.drawCheckbox(g, this.quickprayerBox, "Quick prayer", this.isQuickprayersEnabled());
-		this.drawCheckbox(g, this.prayerOffBox, "Turn prayer off if no target", this.isPrayerOffEnabled());
-		this.drawCheckbox(g, this.switchPrayersBox, "Switch prayers", this.isSwitchPrayersEnabled());
-		this.drawCheckbox(g, this.freeRoamBox, "Free roam", this.isFreeRoamEnabled());
-		this.drawCheckbox(g, this.protectBluePhatsBox, "Protect BluePhats", this.isProtectBluePhatsEnabled());
-		this.drawCheckbox(g, this.reportBox, "Report targets", this.isReportEnabled());
-		this.drawCheckbox(g, this.chatGrabberBox, "Chat grabber", this.chatGrabberEnabled.get());
-		this.drawCheckbox(g, this.focusPlayersBox, "Focus Players", this.focusPlayersEnabled);
-		this.drawCheckbox(g, this.lureMultiBox, "Lure Multi", this.lureMultiEnabled);
-		this.drawCheckbox(g, this.scanHillsBox, "Scan Hills", this.hillScanEnabled);
-		this.drawCheckbox(g, this.noDragBox, "No Drag", this.noDragEnabled);
-		this.drawCheckbox(g, this.unlistBox, "Unlist", this.unlistEnabled);
-		this.drawCheckbox(g, this.whitelistBox, "Whitelist", this.whitelistEnabled);
-		this.drawComboBox(g);
-
-		g.setColor(new Color(26, 180, 250, 30));
-		g.fillRect(0, height - 105, width, 105);
-		int line = height - 100;
-		g.setFont(new Font("Consolas", Font.PLAIN, 11));
-		g.setColor(new Color(200, 220, 255));
-		g.drawString(fitText(g, "Runtime: " + this.timer2.formatTime(), width - 15), 10, line); line += 12;
-
-		long runtime = System.currentTimeMillis() - this.fatigueStart;
-		double currentFatigue = this.getFatigueFactor(runtime);
-		String fatigueStr = String.format("Fatigue: %.1f/20", currentFatigue);
-		if (this.energyBoost > 0.01) {
-			fatigueStr += String.format(" (B:%.1f)", this.energyBoost);
-		}
-		Color fatigueColor = currentFatigue > 12.0 ? new Color(255, 100, 100) :
-				currentFatigue > 6.0 ? new Color(255, 200, 80) :
-						new Color(150, 210, 255);
-		g.setColor(fatigueColor);
-		if (this.fatigueSpikeEndTime > System.currentTimeMillis()) {
-			fatigueStr += " [S]";
-		}
-		if (this.performanceStreakEndTime > System.currentTimeMillis()) {
-			fatigueStr += " [2W]";
-		}
-		g.drawString(fitText(g, fatigueStr, width - 15), 10, line); line += 12;
-
-		Color statusColor = this.status.contains("Error") || this.status.contains("AFK") ?
-				new Color(255, 120, 120) : new Color(180, 200, 255);
-		g.setColor(statusColor);
-		g.drawString(fitText(g, "Status: " + this.status, width - 15), 10, line); line += 13;
-
-		g.drawString(fitText(g, "Actions: " + this.getTotalActions() + " | Session: " + this.getSessionDurationMinutes() + "m", width - 15), 10, line); line += 12;
-
-		g.setColor(new Color(180, 140, 255, 50));
-		g.drawLine(5, line, width - 5, line); line += 5;
-
-		g.setFont(new Font("Arial", Font.BOLD, 11));
-		g.setColor(new Color(180, 140, 255));
-		g.drawString("AI PROFILES", 10, line); line += 13;
-
-		int profileCount = aiAssistant.getPlayerProfiles().size();
-		g.setFont(new Font("Consolas", Font.PLAIN, 10));
-		g.setColor(new Color(180, 180, 180));
-		g.drawString("Tracking: " + profileCount + " players", 10, line); line += 11;
-
-		if (!aiAssistant.getPlayerProfiles().isEmpty()) {
-			java.util.Optional<Map.Entry<String, AIAssistant.PlayerProfile>> topThreat = aiAssistant.getPlayerProfiles().entrySet().stream()
-					.max(java.util.Comparator.comparingDouble(e -> e.getValue().threatDisplay()));
-            double threat = topThreat.get().getValue().threatDisplay();
-            Color threatColor = threat >= 5.0 ? new Color(255, 70, 70) :
-                    threat >= 3.0 ? new Color(255, 165, 50) :
-                            threat >= 1.0 ? new Color(255, 220, 80) :
-                                    new Color(100, 220, 100);
-            g.setColor(threatColor);
-            String topStr = String.format("Top: %s [%.2f]", topThreat.get().getKey(), threat);
-            g.drawString(fitText(g, topStr, width - 15), 10, line);
-        } else {
-			g.setColor(new Color(120, 120, 120));
-			g.drawString("No data yet", 10, line);
-		}
-
-		line += 2;
-		purgeListButton.y = line;
-		reEnergizeButton.y = line;
-		Point guiMouse = Microbot.getMouse().getMousePosition();
-		boolean hovered = guiMouse != null && purgeListButton.contains(guiMouse);
-		g.setColor(hovered ? new Color(60, 55, 70) : new Color(45, 40, 55));
-		g.fillRoundRect(purgeListButton.x, purgeListButton.y, purgeListButton.width, purgeListButton.height, 3, 3);
-		g.setColor(new Color(180, 140, 255, 150));
-		g.drawRoundRect(purgeListButton.x, purgeListButton.y, purgeListButton.width, purgeListButton.height, 3, 3);
-		g.setFont(new Font("Consolas", Font.PLAIN, 10));
-		g.setColor(new Color(200, 200, 220));
-		g.drawString("Purge List", purgeListButton.x + 10, purgeListButton.y + 12);
-		boolean hoveredRe = guiMouse != null && reEnergizeButton.contains(guiMouse);
-		g.setColor(hoveredRe ? new Color(60, 80, 60) : new Color(35, 50, 35));
-		g.fillRoundRect(reEnergizeButton.x, reEnergizeButton.y, reEnergizeButton.width, reEnergizeButton.height, 3, 3);
-		g.setColor(new Color(100, 220, 100, 150));
-		g.drawRoundRect(reEnergizeButton.x, reEnergizeButton.y, reEnergizeButton.width, reEnergizeButton.height, 3, 3);
-		g.setFont(new Font("Consolas", Font.PLAIN, 10));
-		g.setColor(new Color(200, 220, 200));
-		g.drawString("ReEnergize", reEnergizeButton.x + 6, reEnergizeButton.y + 12);
-		line += 17;
-
-		g.setFont(new Font("Arial", Font.BOLD, 10));
-		g.setColor(new Color(100, 100, 100));
-		g.drawString("v" + VERSION, width - 28, line);
-
-		int statsWidth = 194;
-		int statsPanelY = 20;
-		int statsPanelH = 210;
-		g.setColor(new Color(15, 15, 20, 200));
-		g.fillRoundRect(statsPaneX - 3, statsPanelY, statsWidth, statsPanelH, 5, 5);
-		g.setColor(new Color(26, 180, 250, 60));
-		g.drawRoundRect(statsPaneX - 3, statsPanelY, statsWidth - 1, statsPanelH - 1, 5, 5);
-		g.setColor(new Color(26, 180, 250, 12));
-		g.fillRect(statsPaneX - 1, statsPanelY, statsWidth - 4, 18);
-		sessionTracker.drawStats(g, statsPaneX, statsPanelY + 10, currentFatigue);
-
-		int nttY = statsPanelY + statsPanelH + 8;
-		int nttH = 72;
-		g.setColor(new Color(15, 15, 20, 200));
-		g.fillRoundRect(statsPaneX - 3, nttY, statsWidth, nttH, 5, 5);
-		g.setColor(new Color(26, 180, 250, 60));
-		g.drawRoundRect(statsPaneX - 3, nttY, statsWidth - 1, nttH - 1, 5, 5);
-		g.setFont(new Font("Arial", Font.BOLD, 11));
-		g.setColor(new Color(26, 180, 250));
-		g.drawString("NON-TARGET TRACKER", statsPaneX, nttY + 14);
-		g.setFont(new Font("Consolas", Font.PLAIN, 10));
-		g.setColor(new Color(180, 180, 180));
-		g.drawString("Tracked: " + nonTargetTracker.getTrackedCount() + " players", statsPaneX, nttY + 30);
-		Map<String, NonTargetTracker.LastSeenEntry> nttEntries = nonTargetTracker.getEntries();
-		if (!nttEntries.isEmpty()) {
-			NonTargetTracker.LastSeenEntry last = null;
-			for (NonTargetTracker.LastSeenEntry candidate : nttEntries.values()) {
-				if (last == null || candidate.getLastSeenMs() > last.getLastSeenMs()) {
-					last = candidate;
-				}
-			}
-			if (last != null) {
-				String lastStr = String.format("Last: %s @%s (%d,%d,%d) cb=%d",
-						last.getPlayerName(), last.getLocation(),
-						last.getX(), last.getY(), last.getZ(),
-						last.getCombatLevel());
-				int lastMax = statsWidth - 10;
-				if (g.getFontMetrics().stringWidth(lastStr) > lastMax) {
-					lastStr = String.format("Last: %s @%s", last.getPlayerName(), last.getLocation());
-				}
-				if (g.getFontMetrics().stringWidth(lastStr) > lastMax) {
-					String lname = last.getPlayerName();
-					String lloc = last.getLocation();
-					while (lname.length() > 1 && g.getFontMetrics().stringWidth("Last: " + lname + "~ @") > lastMax) {
-						lname = lname.substring(0, lname.length() - 1);
-					}
-					while (lloc.length() > 1 && g.getFontMetrics().stringWidth("Last: " + lname + "~@" + lloc + "~") > lastMax) {
-						lloc = lloc.substring(0, lloc.length() - 1);
-					}
-					lastStr = "Last: " + lname + "~@" + lloc;
-				}
-				g.drawString(lastStr, statsPaneX, nttY + 44);
-			}
-		}
-		g.setColor(new Color(100, 100, 100, 80));
-		g.drawLine(statsPaneX, nttY + 56, statsPaneX + statsWidth - 10, nttY + 56);
-		g.setColor(new Color(120, 120, 120));
-		g.drawString("next save in " + (30000 - (System.currentTimeMillis() % 30000)) / 1000 + "s", statsPaneX + 4, nttY + 66);
-
-		int psY = nttY + nttH + 8;
-		int psH = 130;
-		g.setColor(new Color(15, 15, 20, 200));
-		g.fillRoundRect(statsPaneX - 3, psY, statsWidth, psH, 5, 5);
-		g.setColor(new Color(26, 180, 250, 60));
-		g.drawRoundRect(statsPaneX - 3, psY, statsWidth - 1, psH - 1, 5, 5);
-		g.setColor(new Color(26, 180, 250, 12));
-		g.fillRect(statsPaneX - 1, psY, statsWidth - 4, 18);
-		g.setFont(new Font("Arial", Font.BOLD, 11));
-		g.setColor(new Color(26, 180, 250));
-		g.drawString("ALL-TIME STATS", statsPaneX, psY + 14);
-		g.setFont(new Font("Consolas", Font.PLAIN, 10));
-		g.setColor(new Color(200, 220, 255));
-		g.drawString("Runtime: " + playerStats.getRuntimeString(), statsPaneX, psY + 30);
-		g.setColor(new Color(180, 200, 255));
-		g.drawString(fitText(g, "Current Runtime: " + playerStats.getCurrentRuntimeString(), statsWidth - 10), statsPaneX, psY + 42);
-		g.setColor(new Color(130, 200, 130));
-		g.drawString("XP Earned: " + playerStats.getTotalXpEarned(), statsPaneX, psY + 54);
-		List<Map.Entry<String, Integer>> bullied = playerStats.getTopBullied(5);
-		if (!bullied.isEmpty()) {
-			g.setColor(new Color(255, 160, 100));
-			int by = psY + 68;
-			int maxWidth = statsWidth - 10;
-			for (Map.Entry<String, Integer> entry : bullied) {
-				String name = entry.getKey();
-				String lineStr = name + ": " + entry.getValue();
-				if (g.getFontMetrics().stringWidth(lineStr) > maxWidth) {
-					while (g.getFontMetrics().stringWidth(lineStr) > maxWidth && name.length() > 1) {
-						name = name.substring(0, name.length() - 1);
-						lineStr = name + "~: " + entry.getValue();
-					}
-				}
-				g.drawString(lineStr, statsPaneX, by);
-				by += 12;
-			}
-		} else {
-			g.setColor(new Color(120, 120, 120));
-			g.drawString("No targets attacked yet", statsPaneX, psY + 68);
-		}
-	}
-
-	private void drawCheckbox(Graphics g, Rectangle rect, String label, boolean checked) {
-		g.setColor(new Color(40, 40, 40));
-		g.fillRect(rect.x, rect.y, rect.width, rect.height);
-		g.setColor(checked ? new Color(26, 180, 250) : Color.GRAY);
-		g.drawRect(rect.x, rect.y, rect.width, rect.height);
-		if (checked) {
-			g.setColor(new Color(26, 180, 250));
-			g.fillRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6);
-		}
-		g.setColor(Color.WHITE);
-		g.setFont(new Font("Arial", Font.PLAIN, 12));
-		g.drawString(label, rect.x + 22, rect.y + 12);
-	}
-
-	private String fitText(Graphics g, String text, int maxWidth) {
-		if (g.getFontMetrics().stringWidth(text) <= maxWidth) return text;
-		while (text.length() > 1 && g.getFontMetrics().stringWidth(text + "~") > maxWidth) {
-			text = text.substring(0, text.length() - 1);
-		}
-		return text + "~";
-	}
-
-	private void drawComboBox(Graphics g) {
-		g.setColor(new Color(40, 40, 40));
-		g.fillRect(this.locationComboBox.x, this.locationComboBox.y, this.locationComboBox.width, this.locationComboBox.height);
-		g.setColor(new Color(26, 180, 250));
-		g.drawRect(this.locationComboBox.x, this.locationComboBox.y, this.locationComboBox.width, this.locationComboBox.height);
-		g.setColor(Color.WHITE);
-		g.setFont(new Font("Arial", Font.BOLD, 12));
-		g.drawString(this.selectedLocation, this.locationComboBox.x + 5, this.locationComboBox.y + 15);
-		int arrowX = this.locationComboBox.x + this.locationComboBox.width - 15;
-		int arrowY = this.locationComboBox.y + 15;
-		g.drawString(this.comboBoxExpanded ? "▲" : "▼", arrowX, arrowY);
-		if (this.comboBoxExpanded) {
-			for (int i = 0; i < this.locationOptions.size(); ++i) {
-				int optionY = this.locationComboBox.y + (i + 1) * 20;
-				String location = this.locationOptions.get(i);
-				g.setColor(new Color(30, 30, 30));
-				g.fillRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
-				g.setColor(new Color(60, 60, 60));
-				g.drawRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
-				if (location.equals(this.selectedLocation)) {
-					g.setColor(new Color(26, 180, 250, 100));
-					g.fillRect(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
-				}
-				g.setColor(Color.WHITE);
-				g.setFont(new Font("Arial", Font.PLAIN, 12));
-				g.drawString(location, this.locationComboBox.x + 5, optionY + 15);
-			}
-		}
 	}
 }
