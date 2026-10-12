@@ -16,10 +16,10 @@ public class Config {
     private static final Properties properties = new Properties();
 
     static {
-        String username = System.getProperty("user.name");
-        DEFAULT_CONFIG_PATH = "C:" + File.separator + "Users" + File.separator + username + File.separator + "DreamBot" + File.separator + "Scripts" + File.separator + "config.properties";
+        String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot";
+        DEFAULT_CONFIG_PATH = basePath + File.separator + "config.properties";
         CONFIG_FILE_PATH = System.getProperty("config.path", DEFAULT_CONFIG_PATH);
-        FILE_PATH = "C:" + File.separator + "Users" + File.separator + username + File.separator + "DreamBot" + File.separator + "Scripts" + File.separator + "nslist.txt";
+        FILE_PATH = basePath + File.separator + "nslist.txt";
         load();
     }
 
