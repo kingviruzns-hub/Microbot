@@ -602,12 +602,14 @@ public class AIAssistant {
     }
 
     private static boolean exists(Player player) {
-        return Microbot.getClientThread().runOnClientThreadOptional(() -> {
-            net.runelite.api.Client client = Microbot.getClient();
-            net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
-            return client.getLocalPlayer() != null && worldView != null
-                    && worldView.players().stream().anyMatch(p -> p == player);
-        }).orElse(false);
+        return Microbot.getClientThread().runOnClientThreadOptional(() -> playerExistsOnClientThread(player)).orElse(false);
+    }
+
+    private static boolean playerExistsOnClientThread(Player player) {
+        net.runelite.api.Client client = Microbot.getClient();
+        net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
+        return client.getLocalPlayer() != null && worldView != null
+                && worldView.players().stream().anyMatch(p -> p == player);
     }
 
     private static double distanceBetween(Player from, Player to) {

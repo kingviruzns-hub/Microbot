@@ -74,12 +74,15 @@ public class NonTargetTracker {
     }
 
     private static boolean exists(net.runelite.api.Player player) {
-        return net.runelite.client.plugins.microbot.Microbot.getClientThread().runOnClientThreadOptional(() -> {
-            net.runelite.api.Client client = net.runelite.client.plugins.microbot.Microbot.getClient();
-            net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
-            return client.getLocalPlayer() != null && worldView != null
-                    && worldView.players().stream().anyMatch(p -> p == player);
-        }).orElse(false);
+        return net.runelite.client.plugins.microbot.Microbot.getClientThread()
+                .runOnClientThreadOptional(() -> playerExistsOnClientThread(player)).orElse(false);
+    }
+
+    private static boolean playerExistsOnClientThread(net.runelite.api.Player player) {
+        net.runelite.api.Client client = net.runelite.client.plugins.microbot.Microbot.getClient();
+        net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
+        return client.getLocalPlayer() != null && worldView != null
+                && worldView.players().stream().anyMatch(p -> p == player);
     }
 
     private static net.runelite.api.coords.WorldPoint getWorldLocation(net.runelite.api.Player player) {

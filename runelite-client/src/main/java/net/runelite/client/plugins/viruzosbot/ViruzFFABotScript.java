@@ -1617,6 +1617,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean clickMenuEntryByOption() {
+		Rectangle bounds = canvasBounds();
 		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
 			if (entries == null) return false;
@@ -1625,13 +1626,15 @@ public class ViruzFFABotScript extends Script
 				if (!entry.getOption().toLowerCase(Locale.ROOT).trim().startsWith("attack")) continue;
 				NewMenuEntry nme = new NewMenuEntry(entry.getOption(), entry.getTarget(),
 						entry.getIdentifier(), entry.getType(), entry.getParam0(), entry.getParam1(), false);
-				Rectangle bounds = new Rectangle(0, 0,
-						Microbot.getClient().getCanvasWidth(), Microbot.getClient().getCanvasHeight());
 				Microbot.doInvoke(nme, bounds);
 				return true;
 			}
 			return false;
 		}).orElse(false);
+	}
+
+	private static Rectangle canvasBounds() {
+		return new Rectangle(0, 0, Microbot.getClient().getCanvasWidth(), Microbot.getClient().getCanvasHeight());
 	}
 
 	private void attackingPlayer() {
@@ -3921,10 +3924,14 @@ public class ViruzFFABotScript extends Script
 
 	private Point getClickablePointForObject(net.runelite.api.TileObject obj) {
 		if (obj == null) return null;
-		java.awt.Shape poly = Microbot.getClientThread().runOnClientThreadOptional(obj::getCanvasTilePoly).orElse(null);
+		java.awt.Shape poly = Microbot.getClientThread().runOnClientThreadOptional(() -> tileObjectCanvasTilePoly(obj)).orElse(null);
 		if (poly == null) return null;
 		Rectangle b = poly.getBounds();
 		return new Point(b.x + b.width / 2, b.y + b.height / 2);
+	}
+
+	private static java.awt.Shape tileObjectCanvasTilePoly(net.runelite.api.TileObject obj) {
+		return obj.getCanvasTilePoly();
 	}
 
 	private static Stream<Rs2PlayerModel> getPlayers(Predicate<Rs2PlayerModel> predicate) {
