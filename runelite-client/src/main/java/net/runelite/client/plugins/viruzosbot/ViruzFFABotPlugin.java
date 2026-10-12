@@ -12,6 +12,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import javax.inject.Inject;
 import java.awt.event.MouseEvent;
 
+@SuppressWarnings("unused")
 @PluginDescriptor(
 		name = PluginDescriptor.Default + "Viruz FFA Bot",
 		description = "Clanwars FFA automation bot",

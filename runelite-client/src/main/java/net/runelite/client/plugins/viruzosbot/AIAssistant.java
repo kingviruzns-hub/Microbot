@@ -10,6 +10,8 @@ import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.kit.KitType;
 import net.runelite.client.plugins.microbot.Microbot;
 
+import lombok.Getter;
+
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +32,7 @@ public class AIAssistant {
     private static final double LEARNING_RATE = 0.2;
     private static final double DEFAULT_TARGET_SCORE = 0.5;
 
+    @Getter
     private final Map<String, PlayerProfile> playerProfiles = new ConcurrentHashMap<>();
     private final Map<Integer, Long> animationCooldowns = new ConcurrentHashMap<>();
     private final List<CombatEncounter> recentEncounters = new LinkedList<>();
@@ -188,7 +191,6 @@ public class AIAssistant {
     private CombatStyle detectStyleFromEquipment(Player player) {
         try {
             List<String> equipment = getEquipmentNames(player);
-            if (equipment == null) return CombatStyle.UNKNOWN;
             int mCount = 0, rCount = 0, magCount = 0;
             for (String name : equipment) {
                 if (matchAnyArray(name, MELEE_BODY) || matchAnyArray(name, MELEE_LEGS) || matchAnyArray(name, MELEE_SHIELDS)) mCount++;
@@ -231,10 +233,7 @@ public class AIAssistant {
         if (p == null) return new String[0];
         List<String> gear = new ArrayList<>();
         try {
-            List<String> equipment = getEquipmentNames(p);
-            if (equipment != null) {
-                gear.addAll(equipment);
-            }
+            gear.addAll(getEquipmentNames(p));
         } catch (Exception ignored) {}
         if (!gear.isEmpty()) {
             return gear.toArray(new String[0]);
@@ -301,10 +300,6 @@ public class AIAssistant {
         saveModel();
     }
 
-    public Map<String, PlayerProfile> getPlayerProfiles() {
-        return playerProfiles;
-    }
-
     public void onTick() {
         decayAnimationCooldowns();
         conditionalSave();
@@ -345,7 +340,6 @@ public class AIAssistant {
         if (player == null) return null;
         try {
             List<String> equipment = getEquipmentNames(player);
-            if (equipment == null) return null;
             for (String name : equipment) {
                 if (matchAnyArray(name, MELEE_WEAPONS) || matchAnyArray(name, RANGED_WEAPONS) || matchAnyArray(name, MAGIC_WEAPONS)) {
                     return name;
@@ -561,7 +555,8 @@ public class AIAssistant {
         Map<String, PlayerProfile> profiles;
         List<CombatEncounter> encounters;
         Map<String, AnimationPattern> patterns;
-        ModelData() {} // required by Gson
+        @SuppressWarnings("unused") // required by Gson
+        ModelData() {}
         ModelData(Map<String, PlayerProfile> profiles, List<CombatEncounter> encounters, Map<String, AnimationPattern> patterns) {
             this.profiles = profiles;
             this.encounters = encounters;
@@ -609,7 +604,9 @@ public class AIAssistant {
     private static boolean exists(Player player) {
         return Microbot.getClientThread().runOnClientThreadOptional(() -> {
             net.runelite.api.Client client = Microbot.getClient();
-            return client.getLocalPlayer() != null && client.getPlayers().contains(player);
+            net.runelite.api.WorldView worldView = client.getTopLevelWorldView();
+            return client.getLocalPlayer() != null && worldView != null
+                    && worldView.players().stream().anyMatch(p -> p == player);
         }).orElse(false);
     }
 
@@ -645,7 +642,6 @@ public class AIAssistant {
                 int equipmentId = composition.getEquipmentId(kitType);
                 if (equipmentId < 0) continue;
                 ItemComposition itemComposition = Microbot.getItemManager().getItemComposition(equipmentId);
-                if (itemComposition == null) continue;
                 String name = itemComposition.getName();
                 if (name == null || name.equalsIgnoreCase("null")) continue;
                 names.add(name);

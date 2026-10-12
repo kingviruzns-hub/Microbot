@@ -19,6 +19,7 @@ public class PlayerStats {
 
     private final AtomicLong totalRuntimeMs = new AtomicLong(0);
     private long sessionStartMs = 0L;
+    private long currentSessionStartMs = 0L;
     private long xpAtStart = 0L;
     private long totalXpEarned = 0L;
     private final LinkedHashMap<String, Integer> bulliedAttacks = new LinkedHashMap<>();
@@ -29,6 +30,7 @@ public class PlayerStats {
 
     public void startSession() {
         sessionStartMs = System.currentTimeMillis();
+        currentSessionStartMs = sessionStartMs;
         xpAtStart = getTotalCombatXp();
         load();
     }
@@ -134,7 +136,8 @@ public class PlayerStats {
     }
 
     public String getCurrentRuntimeString() {
-        return formatRuntime(System.currentTimeMillis() - sessionStartMs);
+        long start = currentSessionStartMs > 0 ? currentSessionStartMs : sessionStartMs;
+        return formatRuntime(System.currentTimeMillis() - start);
     }
 
     public long getTotalXpEarned() {
