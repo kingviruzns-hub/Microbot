@@ -4,9 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.input.MouseListener;
+import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
-import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
@@ -27,18 +27,20 @@ public class ViruzFFABotPlugin extends Plugin implements MouseListener {
 	private ViruzFFABotOverlay overlay;
 	@Inject
 	private OverlayManager overlayManager;
+	@Inject
+	private MouseManager mouseManager;
 
 	@Override
 	protected void startUp() throws Exception {
 		overlayManager.add(overlay);
-		Microbot.mouseManager.registerMouseListener(this);
+		mouseManager.registerMouseListener(this);
 		script.run();
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
 		overlayManager.remove(overlay);
-		Microbot.mouseManager.unregisterMouseListener(this);
+		mouseManager.unregisterMouseListener(this);
 		script.shutdown();
 	}
 
