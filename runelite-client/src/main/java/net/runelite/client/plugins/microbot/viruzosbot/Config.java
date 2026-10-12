@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.viruzosbot;
+package net.runelite.client.plugins.microbot.viruzosbot;
 
 import java.io.File;
 import java.io.FileInputStream;

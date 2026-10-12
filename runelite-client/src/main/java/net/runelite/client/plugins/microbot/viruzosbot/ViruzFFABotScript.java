@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.viruzosbot;
+package net.runelite.client.plugins.microbot.viruzosbot;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -159,6 +159,9 @@ public class ViruzFFABotScript extends Script
 	private int ffaScanMisses = 0;
 	private int antiLureFails = 0;
 	public volatile String status = "Paused";
+	private volatile String lastKnownPlayerName = "";
+	private final AtomicBoolean sessionInitialized = new AtomicBoolean(false);
+	private volatile boolean sessionAnnounced = false;
 	private String selectedLocation = "None selected";
 	private int currentThreshold = getRandomThreshold();
 	private WorldArea currentArea = null;
@@ -493,13 +496,28 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void sendDiscordEmbed(String event) {
-		String playerName = "";
-		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
-		if (local != null && local.getName() != null) {
-			playerName = local.getName();
+		try {
+			DiscordWebhook.sendEmbed(getAccountName(), VERSION, this.status,
+					this.timer2 != null ? this.timer2.formatTime() : "00:00:00", event);
+		} catch (Exception e) {
+			log.info("Failed to send Discord embed: {}", e.getMessage());
 		}
-		String runtime = this.timer2 != null ? this.timer2.formatTime() : "00:00:00";
-		DiscordWebhook.sendEmbed(playerName, VERSION, this.status, runtime, event);
+	}
+
+	private String getAccountName() {
+		try {
+			if (Microbot.isLoggedIn()) {
+				Rs2PlayerModel local = Rs2Player.getLocalPlayer();
+				if (local != null) {
+					String name = local.getName();
+					if (name != null && !name.isEmpty()) {
+						lastKnownPlayerName = name;
+					}
+				}
+			}
+		} catch (Exception ignored) {
+		}
+		return lastKnownPlayerName != null ? lastKnownPlayerName : "";
 	}
 
 	private void saveListToFile() {
@@ -774,11 +792,20 @@ public class ViruzFFABotScript extends Script
 
 	@Override
 	public boolean run() {
-		startSession();
+		sessionInitialized.set(false);
+		sessionAnnounced = false;
 		mainScheduledFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
 			try {
+				if (!sessionInitialized.get()) {
+					startSession();
+					sessionInitialized.set(true);
+				}
 				if (!Microbot.isLoggedIn()) return;
 				if (!super.run()) return;
+				if (!sessionAnnounced) {
+					sessionAnnounced = true;
+					sendDiscordEmbed("✅ Script started");
+				}
 				onLoop();
 			} catch (Exception ex) {
 				log.info("Error in main loop: {}", ex.getMessage());
@@ -815,7 +842,6 @@ public class ViruzFFABotScript extends Script
 		this.nextUltradianUpdateMs = System.currentTimeMillis() + Rs2Random.between(600000, 1200000);
 		lastSwitchLevelForCurrentStyle = Rs2Player.getRealSkillLevel(Skill.ATTACK);
 		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
-		sendDiscordEmbed("✅ Script started");
 	}
 
 	private int getRandomThreshold() {
@@ -3467,7 +3493,7 @@ public class ViruzFFABotScript extends Script
 			Rs2TileObjectModel obj = Microbot.getRs2TileObjectCache().query()
 					.where(o -> o.getTileObjectType() == TileObjectType.GAME)
 					.withName(name)
-					.first();
+					.firstOnClientThread();
 			if (obj != null) {
 				return obj;
 			}
@@ -3475,7 +3501,7 @@ public class ViruzFFABotScript extends Script
 		return Microbot.getRs2TileObjectCache().query()
 				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
 				.where(o -> tileObjectHasAction(o, "Climb-down"))
-				.first();
+				.firstOnClientThread();
 	}
 
 	private String getFallbackClimbOption(Rs2TileObjectModel gameObject) {

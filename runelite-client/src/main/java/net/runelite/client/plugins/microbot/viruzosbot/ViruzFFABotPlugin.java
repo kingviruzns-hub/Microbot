@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.viruzosbot;
+package net.runelite.client.plugins.microbot.viruzosbot;
 
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.ChatMessage;

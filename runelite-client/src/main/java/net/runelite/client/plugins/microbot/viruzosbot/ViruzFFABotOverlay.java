@@ -1,6 +1,5 @@
-package net.runelite.client.plugins.viruzosbot;
+package net.runelite.client.plugins.microbot.viruzosbot;
 
-import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -21,10 +20,11 @@ public class ViruzFFABotOverlay extends Overlay {
 
 	@Override
 	public Dimension render(Graphics2D graphics) {
-		if (!Microbot.isLoggedIn()) {
-			return null;
+		try {
+			script.onPaint(graphics);
+		} catch (Exception ex) {
+			// never let a paint error disable the overlay
 		}
-		script.onPaint(graphics);
 		return null;
 	}
 }

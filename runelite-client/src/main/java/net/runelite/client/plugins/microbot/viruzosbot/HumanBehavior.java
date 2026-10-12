@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.viruzosbot;
+package net.runelite.client.plugins.microbot.viruzosbot;
 
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
