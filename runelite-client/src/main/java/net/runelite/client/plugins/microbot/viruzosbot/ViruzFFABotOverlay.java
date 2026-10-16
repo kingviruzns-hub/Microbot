@@ -1,8 +1,8 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
+import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 
 import javax.inject.Inject;
@@ -17,11 +17,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class ViruzFFABotOverlay extends Overlay {
+public class ViruzFFABotOverlay extends OverlayPanel {
 	private final ViruzFFABotScript script;
 
 	@Inject
 	public ViruzFFABotOverlay(ViruzFFABotScript script) {
+		super();
 		this.script = script;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
@@ -29,11 +30,11 @@ public class ViruzFFABotOverlay extends Overlay {
 
 	@Override
 	public Dimension render(Graphics2D graphics) {
-		if (script == null
-				|| script.timer2 == null
-				|| script.selectedLocation == null
-				|| script.status == null) {
-			return null;
+		if (script == null) {
+			return super.render(graphics);
+		}
+		if (script.timer2 == null || script.selectedLocation == null || script.status == null) {
+			return super.render(graphics);
 		}
 		if (script.guiHidden) {
 			graphics.setColor(new Color(20, 20, 20, 200));
@@ -43,7 +44,7 @@ public class ViruzFFABotOverlay extends Overlay {
 			graphics.setColor(Color.WHITE);
 			graphics.setFont(new Font("Arial", Font.BOLD, 14));
 			graphics.drawString("▶", script.guiToggleButton.x + 10, script.guiToggleButton.y + 21);
-			return null;
+			return super.render(graphics);
 		}
 		int width = 260;
 		int statsPaneX = width + 5;
@@ -181,7 +182,9 @@ public class ViruzFFABotOverlay extends Overlay {
 		graphics.drawRoundRect(statsPaneX - 3, statsPanelY, statsWidth - 1, statsPanelH - 1, 5, 5);
 		graphics.setColor(new Color(26, 180, 250, 12));
 		graphics.fillRect(statsPaneX - 1, statsPanelY, statsWidth - 4, 18);
-		script.sessionTracker.drawStats(graphics, statsPaneX, statsPanelY + 10, currentFatigue);
+		if (script.sessionTracker != null) {
+			script.sessionTracker.drawStats(graphics, statsPaneX, statsPanelY + 10, currentFatigue);
+		}
 
 		int nttY = statsPanelY + statsPanelH + 8;
 		int nttH = 72;
@@ -194,36 +197,38 @@ public class ViruzFFABotOverlay extends Overlay {
 		graphics.drawString("NON-TARGET TRACKER", statsPaneX, nttY + 14);
 		graphics.setFont(new Font("Consolas", Font.PLAIN, 10));
 		graphics.setColor(new Color(180, 180, 180));
-		graphics.drawString("Tracked: " + script.nonTargetTracker.getTrackedCount() + " players", statsPaneX, nttY + 30);
-		Map<String, NonTargetTracker.LastSeenEntry> nttEntries = script.nonTargetTracker.getEntries();
-		if (!nttEntries.isEmpty()) {
-			NonTargetTracker.LastSeenEntry last = null;
-			for (NonTargetTracker.LastSeenEntry candidate : nttEntries.values()) {
-				if (last == null || candidate.getLastSeenMs() > last.getLastSeenMs()) {
-					last = candidate;
-				}
-			}
-			if (last != null) {
-				String lastStr = String.format("Last: %s @%s (%d,%d,%d) cb=%d",
-						last.getPlayerName(), last.getLocation(),
-						last.getX(), last.getY(), last.getZ(),
-						last.getCombatLevel());
-				int lastMax = statsWidth - 10;
-				if (graphics.getFontMetrics().stringWidth(lastStr) > lastMax) {
-					lastStr = String.format("Last: %s @%s", last.getPlayerName(), last.getLocation());
-				}
-				if (graphics.getFontMetrics().stringWidth(lastStr) > lastMax) {
-					String lname = last.getPlayerName();
-					String lloc = last.getLocation();
-					while (lname.length() > 1 && graphics.getFontMetrics().stringWidth("Last: " + lname + "~ @") > lastMax) {
-						lname = lname.substring(0, lname.length() - 1);
+		if (script.nonTargetTracker != null) {
+			graphics.drawString("Tracked: " + script.nonTargetTracker.getTrackedCount() + " players", statsPaneX, nttY + 30);
+			Map<String, NonTargetTracker.LastSeenEntry> nttEntries = script.nonTargetTracker.getEntries();
+			if (!nttEntries.isEmpty()) {
+				NonTargetTracker.LastSeenEntry last = null;
+				for (NonTargetTracker.LastSeenEntry candidate : nttEntries.values()) {
+					if (last == null || candidate.getLastSeenMs() > last.getLastSeenMs()) {
+						last = candidate;
 					}
-					while (lloc.length() > 1 && graphics.getFontMetrics().stringWidth("Last: " + lname + "~@" + lloc + "~") > lastMax) {
-						lloc = lloc.substring(0, lloc.length() - 1);
-					}
-					lastStr = "Last: " + lname + "~@" + lloc;
 				}
-				graphics.drawString(lastStr, statsPaneX, nttY + 44);
+				if (last != null) {
+					String lastStr = String.format("Last: %s @%s (%d,%d,%d) cb=%d",
+							last.getPlayerName(), last.getLocation(),
+							last.getX(), last.getY(), last.getZ(),
+							last.getCombatLevel());
+					int lastMax = statsWidth - 10;
+					if (graphics.getFontMetrics().stringWidth(lastStr) > lastMax) {
+						lastStr = String.format("Last: %s @%s", last.getPlayerName(), last.getLocation());
+					}
+					if (graphics.getFontMetrics().stringWidth(lastStr) > lastMax) {
+						String lname = last.getPlayerName();
+						String lloc = last.getLocation();
+						while (lname.length() > 1 && graphics.getFontMetrics().stringWidth("Last: " + lname + "~ @") > lastMax) {
+							lname = lname.substring(0, lname.length() - 1);
+						}
+						while (lloc.length() > 1 && graphics.getFontMetrics().stringWidth("Last: " + lname + "~@" + lloc + "~") > lastMax) {
+							lloc = lloc.substring(0, lloc.length() - 1);
+						}
+						lastStr = "Last: " + lname + "~@" + lloc;
+					}
+					graphics.drawString(lastStr, statsPaneX, nttY + 44);
+				}
 			}
 		}
 		graphics.setColor(new Color(100, 100, 100, 80));
@@ -242,36 +247,38 @@ public class ViruzFFABotOverlay extends Overlay {
 		graphics.setFont(new Font("Arial", Font.BOLD, 11));
 		graphics.setColor(new Color(26, 180, 250));
 		graphics.drawString("ALL-TIME STATS", statsPaneX, psY + 14);
-		graphics.setFont(new Font("Consolas", Font.PLAIN, 10));
-		graphics.setColor(new Color(200, 220, 255));
-		graphics.drawString("Runtime: " + script.playerStats.getRuntimeString(), statsPaneX, psY + 30);
-		graphics.setColor(new Color(180, 200, 255));
-		graphics.drawString(fitText(graphics, "Current Runtime: " + script.playerStats.getCurrentRuntimeString(), statsWidth - 10), statsPaneX, psY + 42);
-		graphics.setColor(new Color(130, 200, 130));
-		graphics.drawString("XP Earned: " + script.playerStats.getTotalXpEarned(), statsPaneX, psY + 54);
-		List<Map.Entry<String, Integer>> bullied = script.playerStats.getTopBullied(5);
-		if (!bullied.isEmpty()) {
-			graphics.setColor(new Color(255, 160, 100));
-			int by = psY + 68;
-			int maxWidth = statsWidth - 10;
-			for (Map.Entry<String, Integer> entry : bullied) {
-				String name = entry.getKey();
-				String lineStr = name + ": " + entry.getValue();
-				if (graphics.getFontMetrics().stringWidth(lineStr) > maxWidth) {
-					while (graphics.getFontMetrics().stringWidth(lineStr) > maxWidth && name.length() > 1) {
-						name = name.substring(0, name.length() - 1);
-						lineStr = name + "~: " + entry.getValue();
+		if (script.playerStats != null) {
+			graphics.setFont(new Font("Consolas", Font.PLAIN, 10));
+			graphics.setColor(new Color(200, 220, 255));
+			graphics.drawString("Runtime: " + script.playerStats.getRuntimeString(), statsPaneX, psY + 30);
+			graphics.setColor(new Color(180, 200, 255));
+			graphics.drawString(fitText(graphics, "Current Runtime: " + script.playerStats.getCurrentRuntimeString(), statsWidth - 10), statsPaneX, psY + 42);
+			graphics.setColor(new Color(130, 200, 130));
+			graphics.drawString("XP Earned: " + script.playerStats.getTotalXpEarned(), statsPaneX, psY + 54);
+			List<Map.Entry<String, Integer>> bullied = script.playerStats.getTopBullied(5);
+			if (!bullied.isEmpty()) {
+				graphics.setColor(new Color(255, 160, 100));
+				int by = psY + 68;
+				int maxWidth = statsWidth - 10;
+				for (Map.Entry<String, Integer> entry : bullied) {
+					String name = entry.getKey();
+					String lineStr = name + ": " + entry.getValue();
+					if (graphics.getFontMetrics().stringWidth(lineStr) > maxWidth) {
+						while (graphics.getFontMetrics().stringWidth(lineStr) > maxWidth && name.length() > 1) {
+							name = name.substring(0, name.length() - 1);
+							lineStr = name + "~: " + entry.getValue();
+						}
 					}
+					graphics.drawString(lineStr, statsPaneX, by);
+					by += 12;
 				}
-				graphics.drawString(lineStr, statsPaneX, by);
-				by += 12;
+			} else {
+				graphics.setColor(new Color(120, 120, 120));
+				graphics.drawString("No targets attacked yet", statsPaneX, psY + 68);
 			}
-		} else {
-			graphics.setColor(new Color(120, 120, 120));
-			graphics.drawString("No targets attacked yet", statsPaneX, psY + 68);
 		}
 
-		return null;
+		return super.render(graphics);
 	}
 
 	private void drawCheckbox(Graphics2D graphics, Rectangle rect, String label, boolean checked) {
