@@ -20,70 +20,28 @@ import java.awt.event.MouseEvent;
 		enabledByDefault = false
 )
 @Slf4j
-public class ViruzFFABotPlugin extends Plugin implements MouseListener {
+public class ViruzFFABotPlugin extends Plugin {
 	@Inject
 	private ViruzFFABotScript script;
 	@Inject
 	private ViruzFFABotOverlay overlay;
 	@Inject
 	private OverlayManager overlayManager;
-	@Inject
-	private MouseManager mouseManager;
 
 	@Override
 	protected void startUp() throws Exception {
 		overlayManager.add(overlay);
-		mouseManager.registerMouseListener(this);
 		script.run();
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
 		overlayManager.remove(overlay);
-		mouseManager.unregisterMouseListener(this);
 		script.shutdown();
 	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
 		script.handleChatMessage(event);
-	}
-
-	@Override
-	public MouseEvent mouseClicked(MouseEvent e) {
-		if (e.getButton() == MouseEvent.BUTTON1) {
-			script.handleMouseClick(e.getPoint());
-		}
-		return script.isPointInGui(e.getPoint()) ? null : e;
-	}
-
-	@Override
-	public MouseEvent mousePressed(MouseEvent e) {
-		return e;
-	}
-
-	@Override
-	public MouseEvent mouseReleased(MouseEvent e) {
-		return e;
-	}
-
-	@Override
-	public MouseEvent mouseEntered(MouseEvent e) {
-		return e;
-	}
-
-	@Override
-	public MouseEvent mouseExited(MouseEvent e) {
-		return e;
-	}
-
-	@Override
-	public MouseEvent mouseDragged(MouseEvent e) {
-		return e;
-	}
-
-	@Override
-	public MouseEvent mouseMoved(MouseEvent e) {
-		return e;
 	}
 }
