@@ -82,6 +82,50 @@ public class ViruzFFABotScript extends Script
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
 		RuneLiteDebug.main(args);
 	}
+
+	public void setConfig(ViruzFFABotConfig config) {
+		this.config = config;
+	}
+
+	private void applyConfig() {
+		if (config == null) return;
+		this.attackEnabled = config.attack();
+		this.walkToTargetEnabled = config.walkToTarget();
+		this.quickprayersEnabled = config.quickPrayer();
+		this.prayerOffEnabled = config.prayerOff();
+		this.switchPrayersEnabled = config.switchPrayers();
+		this.freeRoamEnabled = config.freeRoam();
+		this.protectBluePhatsEnabled = config.protectBluePhats();
+		this.reportEnabled = config.report();
+		this.chatGrabberEnabled.set(config.chatGrabber());
+		this.lureMultiEnabled = config.lureMulti();
+		this.noDragEnabled = config.noDrag();
+		if (this.lureMultiEnabled) {
+			this.noDragEnabled = false;
+		}
+		this.hillScanEnabled = config.scanHills();
+
+		focusPlayerNames.clear();
+		String focus = config.focusPlayers();
+		if (focus != null && !focus.trim().isEmpty()) {
+			for (String name : focus.split(",")) {
+				String trimmed = name.trim().toLowerCase(Locale.ROOT);
+				if (!trimmed.isEmpty()) {
+					focusPlayerNames.add(trimmed);
+				}
+			}
+		}
+		this.focusPlayersEnabled = !focusPlayerNames.isEmpty();
+
+		String unlist = config.unlist();
+		if (unlist != null && !unlist.trim().isEmpty()) {
+			unlistNames(unlist);
+		}
+		String whitelist = config.whitelist();
+		if (whitelist != null && !whitelist.trim().isEmpty()) {
+			whitelistNames(whitelist);
+		}
+	}
 	private static final int REPORT_WIDGET_PARENT = 875;
 	private static final int REASON_PARENT_CHILD_INDEX = 19;
 	private static final int MACRO_REASON_CHILD_INDEX = 0;
@@ -204,8 +248,7 @@ public class ViruzFFABotScript extends Script
 	private boolean hillScanActive = false;
 	boolean hillScanEnabled = false;
 	boolean noDragEnabled = false;
-	boolean unlistEnabled = false;
-	boolean whitelistEnabled = false;
+	private ViruzFFABotConfig config;
 	private final Set<String> focusPlayerNames = new HashSet<>();
 	private final Map<String, Long> lastGrabbedBySender = new HashMap<>();
 	private long nextReportAttemptAtMs = 0L;
@@ -821,6 +864,7 @@ public class ViruzFFABotScript extends Script
 
 	private void startSession() {
 		Config.load();
+		applyConfig();
 		loadAuthorizedUsers();
 		this.timer2 = new Timer();
 		initializeAreaMap();
@@ -877,122 +921,6 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 			this.comboBoxExpanded = false;
-		} else if (this.attackBox.contains(point)) {
-			this.setAttackEnabled(!this.isAttackEnabled());
-			String state = this.isAttackEnabled() ? "On" : "Off";
-			this.log("Attack is set to " + state);
-		} else if (this.walkToTargetBox.contains(point)) {
-			this.setWalkToTargetEnabled(!this.isWalkToTargetEnabled());
-			String state = this.isWalkToTargetEnabled() ? "On" : "Off";
-			this.log("Walk to target is set to " + state);
-		} else if (this.quickprayerBox.contains(point)) {
-			this.setQuickprayersEnabled(!this.isQuickprayersEnabled());
-			String state = this.isQuickprayersEnabled() ? "On" : "Off";
-			this.log("Prayer is set to " + state);
-		} else if (this.prayerOffBox.contains(point)) {
-			this.setPrayerOffEnabled(!this.isPrayerOffEnabled());
-			String state = this.isPrayerOffEnabled() ? "On" : "Off";
-			this.log("Turn prayer off if no target is set to " + state);
-		} else if (this.switchPrayersBox.contains(point)) {
-			this.setSwitchPrayersEnabled(!this.isSwitchPrayersEnabled());
-			String state = this.isSwitchPrayersEnabled() ? "On" : "Off";
-			this.log("Switch prayers is set to " + state);
-		} else if (this.freeRoamBox.contains(point)) {
-			this.setFreeRoamEnabled(!this.isFreeRoamEnabled());
-			String state = this.isFreeRoamEnabled() ? "On" : "Off";
-			this.log("Free roam is set to " + state);
-		} else if (this.protectBluePhatsBox.contains(point)) {
-			this.setProtectBluePhatsEnabled(!this.isProtectBluePhatsEnabled());
-			String state = this.isProtectBluePhatsEnabled() ? "On" : "Off";
-			this.log("Protect BluePhats is set to " + state);
-		} else if (this.reportBox.contains(point)) {
-			this.setReportEnabled(!this.isReportEnabled());
-			String state = this.isReportEnabled() ? "On" : "Off";
-			this.log("Report is set to " + state);
-		} else if (this.chatGrabberBox.contains(point)) {
-			this.chatGrabberEnabled.set(!this.chatGrabberEnabled.get());
-			String state = this.chatGrabberEnabled.get() ? "On" : "Off";
-			this.log("Chat grabber is set to " + state);
-		} else if (this.focusPlayersBox.contains(point)) {
-			this.focusPlayersEnabled = !this.focusPlayersEnabled;
-			if (this.focusPlayersEnabled) {
-				SwingUtilities.invokeLater(() -> {
-					String input = JOptionPane.showInputDialog(null,
-							"Enter player name(s) to focus (comma-separated):",
-							"Focus Players", JOptionPane.PLAIN_MESSAGE);
-					if (input != null && !input.trim().isEmpty()) {
-						focusPlayerNames.clear();
-						for (String name : input.split(",")) {
-							String trimmed = name.trim().toLowerCase(Locale.ROOT);
-							if (!trimmed.isEmpty()) {
-								focusPlayerNames.add(trimmed);
-							}
-						}
-						this.log("Focus players set to: " + String.join(", ", focusPlayerNames));
-						sendDiscordEmbed("🎯 Focus players set to: **" + String.join(", ", focusPlayerNames) + "**");
-					} else {
-						focusPlayersEnabled = false;
-					}
-				});
-			} else {
-				focusPlayerNames.clear();
-				this.log("Focus players disabled");
-			}
-		} else if (this.lureMultiBox.contains(point)) {
-			this.lureMultiEnabled = !this.lureMultiEnabled;
-			if (this.lureMultiEnabled) {
-				this.noDragEnabled = false;
-			}
-			String state = this.lureMultiEnabled ? "On" : "Off";
-			this.log("Lure Multi is set to " + state);
-		} else if (this.scanHillsBox.contains(point)) {
-			if (!this.hillScanActive) {
-				this.hillScanEnabled = true;
-				this.log("Scan Hills requested");
-			}
-		} else if (this.noDragBox.contains(point)) {
-			this.noDragEnabled = !this.noDragEnabled;
-			if (this.noDragEnabled) {
-				this.lureMultiEnabled = false;
-			}
-			String state = this.noDragEnabled ? "On" : "Off";
-			this.log("No Drag is set to " + state);
-		} else if (this.unlistBox.contains(point)) {
-			this.unlistEnabled = !this.unlistEnabled;
-			if (this.unlistEnabled) {
-				SwingUtilities.invokeLater(() -> {
-					String input = JOptionPane.showInputDialog(null,
-							"Enter player name(s) to unlist (comma-separated):",
-							"Unlist", JOptionPane.PLAIN_MESSAGE);
-					if (input != null && !input.trim().isEmpty()) {
-						unlistNames(input);
-						unlistEnabled = false;
-					} else {
-						unlistEnabled = false;
-						this.log("Unlist cancelled");
-					}
-				});
-			} else {
-				this.log("Unlist disabled");
-			}
-		} else if (this.whitelistBox.contains(point)) {
-			this.whitelistEnabled = !this.whitelistEnabled;
-			if (this.whitelistEnabled) {
-				SwingUtilities.invokeLater(() -> {
-					String input = JOptionPane.showInputDialog(null,
-							"Enter player name(s) to whitelist (comma-separated):",
-							"Whitelist", JOptionPane.PLAIN_MESSAGE);
-					if (input != null && !input.trim().isEmpty()) {
-						whitelistNames(input);
-						whitelistEnabled = false;
-					} else {
-						whitelistEnabled = false;
-						this.log("Whitelist cancelled");
-					}
-				});
-			} else {
-				this.log("Whitelist disabled");
-			}
 		} else if (this.purgeListButton.contains(point)) {
 			this.purgeInactiveProfiles();
 		} else if (this.reEnergizeButton.contains(point)) {
@@ -1006,21 +934,6 @@ public class ViruzFFABotScript extends Script
 		}
 		return this.hideGuiButton.contains(p)
 				|| this.locationComboBox.contains(p)
-				|| this.attackBox.contains(p)
-				|| this.walkToTargetBox.contains(p)
-				|| this.quickprayerBox.contains(p)
-				|| this.prayerOffBox.contains(p)
-				|| this.switchPrayersBox.contains(p)
-				|| this.freeRoamBox.contains(p)
-				|| this.protectBluePhatsBox.contains(p)
-				|| this.reportBox.contains(p)
-				|| this.chatGrabberBox.contains(p)
-				|| this.focusPlayersBox.contains(p)
-				|| this.lureMultiBox.contains(p)
-				|| this.scanHillsBox.contains(p)
-				|| this.noDragBox.contains(p)
-				|| this.unlistBox.contains(p)
-				|| this.whitelistBox.contains(p)
 				|| this.purgeListButton.contains(p)
 				|| this.reEnergizeButton.contains(p);
 	}

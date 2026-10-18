@@ -3,14 +3,11 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.Subscribe;
-import net.runelite.client.input.MouseListener;
-import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
-import java.awt.event.MouseEvent;
 
 @SuppressWarnings("unused")
 @PluginDescriptor(
@@ -27,9 +24,12 @@ public class ViruzFFABotPlugin extends Plugin {
 	private ViruzFFABotOverlay overlay;
 	@Inject
 	private OverlayManager overlayManager;
+	@Inject
+	private ViruzFFABotConfig config;
 
 	@Override
 	protected void startUp() throws Exception {
+		script.setConfig(config);
 		overlayManager.add(overlay);
 		script.run();
 	}
