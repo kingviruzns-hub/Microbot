@@ -70,22 +70,7 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 		graphics.drawString("×", script.hideGuiButton.x + 6, script.hideGuiButton.y + 15);
 
 		graphics.setFont(new Font("Arial", Font.PLAIN, 12));
-		drawCheckbox(graphics, script.attackBox, "Attack", script.isAttackEnabled());
-		drawCheckbox(graphics, script.walkToTargetBox, "Walk to target", script.isWalkToTargetEnabled());
-		drawCheckbox(graphics, script.quickprayerBox, "Quick prayer", script.isQuickprayersEnabled());
-		drawCheckbox(graphics, script.prayerOffBox, "Turn prayer off if no target", script.isPrayerOffEnabled());
-		drawCheckbox(graphics, script.switchPrayersBox, "Switch prayers", script.isSwitchPrayersEnabled());
-		drawCheckbox(graphics, script.freeRoamBox, "Free roam", script.isFreeRoamEnabled());
-		drawCheckbox(graphics, script.protectBluePhatsBox, "Protect BluePhats", script.isProtectBluePhatsEnabled());
-		drawCheckbox(graphics, script.reportBox, "Report targets", script.isReportEnabled());
-		drawCheckbox(graphics, script.chatGrabberBox, "Chat grabber", script.chatGrabberEnabled.get());
-		drawCheckbox(graphics, script.focusPlayersBox, "Focus Players", script.focusPlayersEnabled);
-		drawCheckbox(graphics, script.lureMultiBox, "Lure Multi", script.lureMultiEnabled);
-		drawCheckbox(graphics, script.scanHillsBox, "Scan Hills", script.hillScanEnabled);
-		drawCheckbox(graphics, script.noDragBox, "No Drag", script.noDragEnabled);
-		drawCheckbox(graphics, script.unlistBox, "Unlist", script.unlistEnabled);
-		drawCheckbox(graphics, script.whitelistBox, "Whitelist", script.whitelistEnabled);
-		drawComboBox(graphics);
+		graphics.drawString("Configure via plugin settings", 10, 75);
 
 		graphics.setColor(new Color(26, 180, 250, 30));
 		graphics.fillRect(0, height - 105, width, 105);
