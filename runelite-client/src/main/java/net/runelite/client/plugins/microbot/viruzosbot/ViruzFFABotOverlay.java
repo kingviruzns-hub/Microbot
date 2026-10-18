@@ -1,6 +1,5 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
-import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -10,8 +9,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.Rectangle;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -36,16 +33,6 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 		if (script.timer2 == null || script.selectedLocation == null || script.status == null) {
 			return super.render(graphics);
 		}
-		if (script.guiHidden) {
-			graphics.setColor(new Color(20, 20, 20, 200));
-			graphics.fillRect(script.guiToggleButton.x, script.guiToggleButton.y, script.guiToggleButton.width, script.guiToggleButton.height);
-			graphics.setColor(new Color(26, 180, 250));
-			graphics.drawRect(script.guiToggleButton.x, script.guiToggleButton.y, script.guiToggleButton.width, script.guiToggleButton.height);
-			graphics.setColor(Color.WHITE);
-			graphics.setFont(new Font("Arial", Font.BOLD, 14));
-			graphics.drawString("▶", script.guiToggleButton.x + 10, script.guiToggleButton.y + 21);
-			return super.render(graphics);
-		}
 		int width = 260;
 		int statsPaneX = width + 5;
 		int height = 540;
@@ -60,14 +47,6 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 		graphics.setColor(Color.WHITE);
 		graphics.setFont(new Font("Arial", Font.BOLD, 16));
 		graphics.drawString("ViruzFFABot", 65, 22);
-
-		graphics.setColor(new Color(40, 40, 40));
-		graphics.fillRect(script.hideGuiButton.x, script.hideGuiButton.y, script.hideGuiButton.width, script.hideGuiButton.height);
-		graphics.setColor(new Color(26, 180, 250));
-		graphics.drawRect(script.hideGuiButton.x, script.hideGuiButton.y, script.hideGuiButton.width, script.hideGuiButton.height);
-		graphics.setColor(Color.WHITE);
-		graphics.setFont(new Font("Arial", Font.BOLD, 12));
-		graphics.drawString("×", script.hideGuiButton.x + 6, script.hideGuiButton.y + 15);
 
 		graphics.setFont(new Font("Arial", Font.PLAIN, 12));
 		graphics.drawString("Configure via plugin settings", 10, 75);
@@ -132,27 +111,7 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 			graphics.drawString("No data yet", 10, line);
 		}
 
-		line += 2;
-		script.purgeListButton.y = line;
-		script.reEnergizeButton.y = line;
-		Point guiMouse = Microbot.getMouse().getMousePosition();
-		boolean hovered = guiMouse != null && script.purgeListButton.contains(guiMouse);
-		graphics.setColor(hovered ? new Color(60, 55, 70) : new Color(45, 40, 55));
-		graphics.fillRoundRect(script.purgeListButton.x, script.purgeListButton.y, script.purgeListButton.width, script.purgeListButton.height, 3, 3);
-		graphics.setColor(new Color(180, 140, 255, 150));
-		graphics.drawRoundRect(script.purgeListButton.x, script.purgeListButton.y, script.purgeListButton.width, script.purgeListButton.height, 3, 3);
-		graphics.setFont(new Font("Consolas", Font.PLAIN, 10));
-		graphics.setColor(new Color(200, 200, 220));
-		graphics.drawString("Purge List", script.purgeListButton.x + 10, script.purgeListButton.y + 12);
-		boolean hoveredRe = guiMouse != null && script.reEnergizeButton.contains(guiMouse);
-		graphics.setColor(hoveredRe ? new Color(60, 80, 60) : new Color(35, 50, 35));
-		graphics.fillRoundRect(script.reEnergizeButton.x, script.reEnergizeButton.y, script.reEnergizeButton.width, script.reEnergizeButton.height, 3, 3);
-		graphics.setColor(new Color(100, 220, 100, 150));
-		graphics.drawRoundRect(script.reEnergizeButton.x, script.reEnergizeButton.y, script.reEnergizeButton.width, script.reEnergizeButton.height, 3, 3);
-		graphics.setFont(new Font("Consolas", Font.PLAIN, 10));
-		graphics.setColor(new Color(200, 220, 200));
-		graphics.drawString("ReEnergize", script.reEnergizeButton.x + 6, script.reEnergizeButton.y + 12);
-		line += 17;
+		line += 19;
 
 		graphics.setFont(new Font("Arial", Font.BOLD, 10));
 		graphics.setColor(new Color(100, 100, 100));
@@ -266,55 +225,11 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 		return super.render(graphics);
 	}
 
-	private void drawCheckbox(Graphics2D graphics, Rectangle rect, String label, boolean checked) {
-		graphics.setColor(new Color(40, 40, 40));
-		graphics.fillRect(rect.x, rect.y, rect.width, rect.height);
-		graphics.setColor(checked ? new Color(26, 180, 250) : Color.GRAY);
-		graphics.drawRect(rect.x, rect.y, rect.width, rect.height);
-		if (checked) {
-			graphics.setColor(new Color(26, 180, 250));
-			graphics.fillRect(rect.x + 3, rect.y + 3, rect.width - 6, rect.height - 6);
-		}
-		graphics.setColor(Color.WHITE);
-		graphics.setFont(new Font("Arial", Font.PLAIN, 12));
-		graphics.drawString(label, rect.x + 22, rect.y + 12);
-	}
-
 	private String fitText(Graphics2D graphics, String text, int maxWidth) {
 		if (graphics.getFontMetrics().stringWidth(text) <= maxWidth) return text;
 		while (text.length() > 1 && graphics.getFontMetrics().stringWidth(text + "~") > maxWidth) {
 			text = text.substring(0, text.length() - 1);
 		}
 		return text + "~";
-	}
-
-	private void drawComboBox(Graphics2D graphics) {
-		graphics.setColor(new Color(40, 40, 40));
-		graphics.fillRect(script.locationComboBox.x, script.locationComboBox.y, script.locationComboBox.width, script.locationComboBox.height);
-		graphics.setColor(new Color(26, 180, 250));
-		graphics.drawRect(script.locationComboBox.x, script.locationComboBox.y, script.locationComboBox.width, script.locationComboBox.height);
-		graphics.setColor(Color.WHITE);
-		graphics.setFont(new Font("Arial", Font.BOLD, 12));
-		graphics.drawString(script.selectedLocation, script.locationComboBox.x + 5, script.locationComboBox.y + 15);
-		int arrowX = script.locationComboBox.x + script.locationComboBox.width - 15;
-		int arrowY = script.locationComboBox.y + 15;
-		graphics.drawString(script.comboBoxExpanded ? "▲" : "▼", arrowX, arrowY);
-		if (script.comboBoxExpanded) {
-			for (int i = 0; i < script.locationOptions.size(); ++i) {
-				int optionY = script.locationComboBox.y + (i + 1) * 20;
-				String location = script.locationOptions.get(i);
-				graphics.setColor(new Color(30, 30, 30));
-				graphics.fillRect(script.locationComboBox.x, optionY, script.locationComboBox.width, 20);
-				graphics.setColor(new Color(60, 60, 60));
-				graphics.drawRect(script.locationComboBox.x, optionY, script.locationComboBox.width, 20);
-				if (location.equals(script.selectedLocation)) {
-					graphics.setColor(new Color(26, 180, 250, 100));
-					graphics.fillRect(script.locationComboBox.x, optionY, script.locationComboBox.width, 20);
-				}
-				graphics.setColor(Color.WHITE);
-				graphics.setFont(new Font("Arial", Font.PLAIN, 12));
-				graphics.drawString(location, script.locationComboBox.x + 5, optionY + 15);
-			}
-		}
 	}
 }

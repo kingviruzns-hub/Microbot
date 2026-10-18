@@ -12,6 +12,26 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigSection(name = "Bot Toggles", description = "Enable/disable bot features", position = 0)
     String toggles = "toggles";
 
+    enum Location {
+        NONE_SELECTED("None selected"),
+        PORTAL("Portal"),
+        HILLS_SINGLE("Hills single"),
+        LAVA_SINGLE("Lava single"),
+        POND_SINGLE("Pond single"),
+        MIDDLE("Middle"),
+        HILLS("Hills"),
+        POND("Pond"),
+        LAVA("Lava");
+
+        @lombok.Getter
+        private final String displayName;
+
+        Location(String displayName) { this.displayName = displayName; }
+
+        @Override
+        public String toString() { return displayName; }
+    }
+
     @ConfigItem(keyName = "attack", name = "Attack", description = "Attack targets", position = 0, section = toggles)
     default boolean attack() { return true; }
 
@@ -48,7 +68,13 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 11, section = toggles)
     default boolean noDrag() { return false; }
 
-    @ConfigSection(name = "Player Lists", description = "Comma-separated player name lists", position = 1)
+    @ConfigSection(name = "Location", description = "Combat area selection", position = 1)
+    String locationSection = "locationSection";
+
+    @ConfigItem(keyName = "location", name = "Location", description = "Combat area to fight in", position = 0, section = locationSection)
+    default Location location() { return Location.NONE_SELECTED; }
+
+    @ConfigSection(name = "Player Lists", description = "Comma-separated player name lists", position = 2)
     String playerLists = "playerLists";
 
     @ConfigItem(keyName = "focusPlayers", name = "Focus Players", description = "Only target these players (comma-separated)", position = 0, section = playerLists)

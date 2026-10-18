@@ -40,8 +40,7 @@ import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
-import javax.swing.JOptionPane;
-import javax.swing.SwingUtilities;
+
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.io.BufferedWriter;
@@ -83,12 +82,9 @@ public class ViruzFFABotScript extends Script
 		RuneLiteDebug.main(args);
 	}
 
-	public void setConfig(ViruzFFABotConfig config) {
-		this.config = config;
-	}
-
-	private void applyConfig() {
+    private void applyConfig() {
 		if (config == null) return;
+		this.selectedLocation = config.location() != null ? config.location().getDisplayName() : "None selected";
 		this.attackEnabled = config.attack();
 		this.walkToTargetEnabled = config.walkToTarget();
 		this.quickprayersEnabled = config.quickPrayer();
@@ -138,27 +134,6 @@ public class ViruzFFABotScript extends Script
 	private static final String RUNE_ARROW = "Rune arrow";
 	private static final String ADAMANT_ARROW = "Adamant arrow";
 	private static final String MITHRIL_ARROW = "Mithril arrow";
-	final Rectangle attackBox = new Rectangle(10, 70, 14, 14);
-	final Rectangle walkToTargetBox = new Rectangle(10, 90, 14, 14);
-	final Rectangle quickprayerBox = new Rectangle(10, 110, 14, 14);
-	final Rectangle prayerOffBox = new Rectangle(10, 130, 14, 14);
-	final Rectangle switchPrayersBox = new Rectangle(10, 150, 14, 14);
-	final Rectangle freeRoamBox = new Rectangle(10, 170, 14, 14);
-	final Rectangle protectBluePhatsBox = new Rectangle(10, 190, 14, 14);
-	final Rectangle reportBox = new Rectangle(10, 210, 14, 14);
-	final Rectangle chatGrabberBox = new Rectangle(10, 230, 14, 14);
-	final Rectangle focusPlayersBox = new Rectangle(10, 250, 14, 14);
-	final Rectangle lureMultiBox = new Rectangle(10, 270, 14, 14);
-	final Rectangle scanHillsBox = new Rectangle(10, 290, 14, 14);
-	final Rectangle noDragBox = new Rectangle(10, 310, 14, 14);
-	final Rectangle unlistBox = new Rectangle(10, 330, 14, 14);
-	final Rectangle whitelistBox = new Rectangle(10, 350, 14, 14);
-	final Rectangle purgeListButton = new Rectangle(12, 0, 85, 16);
-	final Rectangle reEnergizeButton = new Rectangle(102, 0, 85, 16);
-	final Rectangle locationComboBox = new Rectangle(10, 40, 110, 20);
-	final Rectangle hideGuiButton = new Rectangle(236, 4, 20, 20);
-	final Rectangle guiToggleButton = new Rectangle(0, 0, 30, 30);
-	boolean guiHidden = false;
 	private final WorldArea AT_LOBBY = new WorldArea(3128, 3625, 11, 11, 0);
 	private final WorldArea SAFE_ZONE = new WorldArea(3318, 4748, 21, 12, 0);
 	private final WorldArea IN_FFA = new WorldArea(3274, 4760, 106, 94, 0);
@@ -195,7 +170,6 @@ public class ViruzFFABotScript extends Script
 	@Getter
 	@Setter
 	private boolean reportEnabled = false;
-	boolean comboBoxExpanded = false;
 	private int antiLureScan = 0;
 	private int ffaScanMisses = 0;
 	private int antiLureFails = 0;
@@ -234,7 +208,6 @@ public class ViruzFFABotScript extends Script
 	private final Set<String> targets = new HashSet<>();
 	private final Set<String> bluePhatNames = new HashSet<>();
 	private final Map<String, WorldArea> areaMap = new HashMap<>();
-	final List<String> locationOptions = Arrays.asList("None selected", "Portal", "Hills single", "Lava single", "Pond single", "Middle", "Hills", "Pond", "Lava");
 	private static final Set<Integer> MAGIC_ATTACK_ANIMATIONS = Set.of(1162, 1163, 1164, 1165, 1978, 1979);
 	private long nextAfkBreakTime = System.currentTimeMillis() + Rs2Random.between(1800000, 3600000);
 	private static final Set<Integer> RANGE_ATTACK_ANIMATIONS = Set.of(426, 4230, 929);
@@ -248,7 +221,8 @@ public class ViruzFFABotScript extends Script
 	private boolean hillScanActive = false;
 	boolean hillScanEnabled = false;
 	boolean noDragEnabled = false;
-	private ViruzFFABotConfig config;
+	@Setter
+    private ViruzFFABotConfig config;
 	private final Set<String> focusPlayerNames = new HashSet<>();
 	private final Map<String, Long> lastGrabbedBySender = new HashMap<>();
 	private long nextReportAttemptAtMs = 0L;
@@ -868,6 +842,7 @@ public class ViruzFFABotScript extends Script
 		loadAuthorizedUsers();
 		this.timer2 = new Timer();
 		initializeAreaMap();
+		this.currentArea = this.areaMap.get(this.selectedLocation);
 		removeBlockedNamesFromFile(this.filePath);
 		removeDuplicateNamesFromAllLists();
 		setNextPreventLogout();
@@ -889,54 +864,7 @@ public class ViruzFFABotScript extends Script
 		return ThreadLocalRandom.current().nextInt(5000, 10001);
 	}
 
-	public void handleMouseClick(Point point) {
-		if (this.guiHidden) {
-			if (this.guiToggleButton.contains(point)) {
-				this.guiHidden = false;
-				this.log("GUI shown");
-			}
-			return;
-		}
-		if (this.selectedLocation == null) {
-			return;
-		}
-		if (this.hideGuiButton.contains(point)) {
-			this.guiHidden = true;
-			this.log("GUI hidden");
-			return;
-		}
-		if (this.locationComboBox.contains(point)) {
-			this.comboBoxExpanded = !this.comboBoxExpanded;
-			this.log(this.comboBoxExpanded ? "Location dropdown expanded" : "Location dropdown collapsed");
-		} else if (this.comboBoxExpanded) {
-			for (int i = 0; i < this.locationOptions.size(); ++i) {
-				int optionY = this.locationComboBox.y + (i + 1) * 20;
-				Rectangle optionRect = new Rectangle(this.locationComboBox.x, optionY, this.locationComboBox.width, 20);
-				if (optionRect.contains(point)) {
-					this.selectedLocation = this.locationOptions.get(i);
-					this.currentArea = this.areaMap.get(this.selectedLocation);
-					this.log("Selected location: " + this.selectedLocation);
-					this.comboBoxExpanded = false;
-					return;
-				}
-			}
-			this.comboBoxExpanded = false;
-		} else if (this.purgeListButton.contains(point)) {
-			this.purgeInactiveProfiles();
-		} else if (this.reEnergizeButton.contains(point)) {
-			this.reEnergize();
-		}
-	}
 
-	public boolean isPointInGui(Point p) {
-		if (this.guiHidden) {
-			return this.guiToggleButton.contains(p);
-		}
-		return this.hideGuiButton.contains(p)
-				|| this.locationComboBox.contains(p)
-				|| this.purgeListButton.contains(p)
-				|| this.reEnergizeButton.contains(p);
-	}
 
 	private void onLoop() {
 		try {
@@ -3719,51 +3647,6 @@ public class ViruzFFABotScript extends Script
 		} catch (IOException var7) {
 			this.log("Error reading main user file: " + var7.getMessage());
 		}
-	}
-
-	private static final long WEEK_MS = 7L * 24 * 60 * 60 * 1000;
-
-	private void purgeInactiveProfiles() {
-		Map<String, AIAssistant.PlayerProfile> profiles = aiAssistant.getPlayerProfiles();
-		if (profiles.isEmpty()) {
-			this.log("Purge List: no profiles to purge");
-			return;
-		}
-
-		int quitCount = 0;
-		int activeCount = 0;
-		final long now = System.currentTimeMillis();
-		for (Map.Entry<String, AIAssistant.PlayerProfile> e : profiles.entrySet()) {
-			String name = e.getKey();
-			if (name == null || name.isEmpty()) continue;
-			AIAssistant.PlayerProfile profile = e.getValue();
-			long lastSeenMs = profile.lastSeenAt;
-			if (lastSeenMs <= 0) continue;
-			if (now - lastSeenMs > WEEK_MS) {
-				aiAssistant.removeProfile(name);
-				nonTargetTracker.markAsQuit(name, lastSeenMs);
-				this.log("Purge List: removed " + name + " from ai_data.json (quit, last seen "
-						+ java.time.Instant.ofEpochMilli(lastSeenMs)
-						.atZone(java.time.ZoneId.systemDefault())
-						.toLocalDate()
-						+ ")");
-				quitCount++;
-			} else {
-				aiAssistant.clearQuitStatus(name);
-				nonTargetTracker.clearQuitStatus(name);
-				activeCount++;
-			}
-		}
-		this.log("Purge List: marked " + quitCount + " inactive profile(s) as quit, cleared quit flag for " + activeCount + " active profile(s)");
-	}
-
-	private void reEnergize() {
-		long now = System.currentTimeMillis();
-		long runtime = now - fatigueStart;
-		long reduction = (long) (runtime * 0.25);
-		fatigueStart += reduction;
-		this.status = "ReEnergized! Fatigue reduced";
-		this.log("ReEnergize: fatigue reduced by ~25%");
 	}
 
 	private void checkEquipmentTab() {
