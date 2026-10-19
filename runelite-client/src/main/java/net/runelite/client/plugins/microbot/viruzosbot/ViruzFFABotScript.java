@@ -876,9 +876,6 @@ public class ViruzFFABotScript extends Script
 				this.climbdownStairs();
 				this.clickPortal();
 			}
-			if (this.hillScanEnabled && !this.hillScanActive) {
-				this.runTrackerScans();
-			}
 			this.onAction();
 
 			if (this.isDistracted() && !isPlayerInCombat(localPlayer) && this.isAtDesignatedArea(localPlayer)) {
@@ -1676,7 +1673,7 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 
-			boolean attacked = false;
+			boolean interacted = false;
 			if (playerExists(target) && distanceBetween(localPlayer, target) <= MAX_TARGET_DISTANCE) {
 				boolean onScreen = isPlayerOnScreen(target);
 				boolean nearby = distanceBetween(localPlayer, target) <= 5.0;
@@ -1684,9 +1681,11 @@ public class ViruzFFABotScript extends Script
 					onScreen = this.rotateCameraToFace(target);
 				}
 				if (onScreen || nearby) {
-					attacked = rightClickInteract(target);
+					interacted = rightClickInteract(target);
 				}
 			}
+			boolean attacked = interacted && !targetName.isEmpty()
+					&& Global.sleepUntil(() -> !notInteractingWith(targetName), 1500);
 			if (attacked) {
 				this.status = "Attacking " + target.getName();
 				this.log(this.status);
@@ -1706,6 +1705,8 @@ public class ViruzFFABotScript extends Script
 				String[] gear = aiAssistant.generateWeaponList(target);
 				aiAssistant.learnFromEncounter(target.getName(), target.getCombatLevel(), gear, 99, foughtBack, false, true);
 				if (!playerExists(target)) sessionTracker.recordSuccessfulHit();
+			} else if (interacted) {
+				this.status = "Attack did not land on " + target.getName();
 			} else {
 				this.status = "Couldn't attack target";
 			}
@@ -1860,11 +1861,6 @@ public class ViruzFFABotScript extends Script
 			Global.sleep(Rs2Random.between(50, 200));
 		}
 
-		boolean isLowHp = false;
-		if (aiAssistant.shouldLeftClickInstead(isLowHp, fatigueF)) {
-			Microbot.getMouse().click();
-			return true;
-		}
 		mouseClick(clickPoint);
 		Global.sleepUntil(this::isMenuVisible, 2000);
 		return clickMenuEntryByOption();
