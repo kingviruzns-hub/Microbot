@@ -1422,11 +1422,6 @@ public class ViruzFFABotScript extends Script
 		return new Point(rp.getX(), rp.getY());
 	}
 
-	private void mouseClick(Point point) {
-		if (point == null) return;
-		Microbot.getMouse().click(new net.runelite.api.Point(point.x, point.y), true);
-	}
-
 	private int getCameraYawDegrees() {
 		return normalizeYaw(Rs2Camera.getAngle());
 	}
@@ -1471,34 +1466,6 @@ public class ViruzFFABotScript extends Script
 			}
 		}
 		return "";
-	}
-
-	private boolean isMenuVisible() {
-		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
-			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
-			return Microbot.getClient().isMenuOpen() && entries != null && entries.length > 0;
-		}).orElse(false);
-	}
-
-	private boolean clickMenuEntryByOption() {
-		Rectangle bounds = canvasBounds();
-		return Microbot.getClientThread().runOnClientThreadOptional(() -> {
-			MenuEntry[] entries = Microbot.getClient().getMenu().getMenuEntries();
-			if (entries == null) return false;
-			for (MenuEntry entry : entries) {
-				if (entry == null || entry.getOption() == null) continue;
-				if (!entry.getOption().toLowerCase(Locale.ROOT).trim().startsWith("attack")) continue;
-				NewMenuEntry nme = new NewMenuEntry(entry.getOption(), entry.getTarget(),
-						entry.getIdentifier(), entry.getType(), entry.getParam0(), entry.getParam1(), false);
-				Microbot.doInvoke(nme, bounds);
-				return true;
-			}
-			return false;
-		}).orElse(false);
-	}
-
-	private static Rectangle canvasBounds() {
-		return new Rectangle(0, 0, Microbot.getClient().getCanvasWidth(), Microbot.getClient().getCanvasHeight());
 	}
 
 	private void attackingPlayer() {
@@ -2339,8 +2306,6 @@ public class ViruzFFABotScript extends Script
 				sessionTracker.recordAntiLure();
 				sendDiscordEmbed("Detected possible drag/lure, returning to " + areaName);
 			}
-			long fatigueR = System.currentTimeMillis() - fatigueStart;
-			double fatigueF = this.getFatigueFactor(fatigueR);
 			Rs2Walker.walkTo(randomAreaTile(this.currentArea));
 			Global.sleep(2500);
 			localPlayer = Rs2Player.getLocalPlayer();
@@ -2809,9 +2774,7 @@ public class ViruzFFABotScript extends Script
 					localPlayer = Rs2Player.getLocalPlayer();
 					if (!playerExists(localPlayer)) break;
 					if (localPlayer.getWorldLocation() != null && destArea.contains(localPlayer.getWorldLocation())) break;
-					long fatigueR = System.currentTimeMillis() - fatigueStart;
-					double fatigueF = this.getFatigueFactor(fatigueR);
-					humanWalk(destTile, fatigueF);
+					Rs2Walker.walkTo(destTile);
 					this.sleepWithFatigue(1200, 2500);
 				}
 

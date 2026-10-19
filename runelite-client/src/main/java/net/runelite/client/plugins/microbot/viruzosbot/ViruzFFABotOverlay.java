@@ -27,6 +27,7 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 
 	@Override
 	public Dimension render(Graphics2D graphics) {
+		try {
 		if (script == null) {
 			return super.render(graphics);
 		}
@@ -223,6 +224,9 @@ public class ViruzFFABotOverlay extends OverlayPanel {
 		}
 
 		return super.render(graphics);
+		} catch (Exception e) {
+			return super.render(graphics);
+		}
 	}
 
 	private String fitText(Graphics2D graphics, String text, int maxWidth) {
