@@ -2786,7 +2786,7 @@ public class ViruzFFABotScript extends Script
 
 		try {
 			WorldArea[] scanAreas = {this.AT_LOBBY, this.SAFE_ZONE, this.areaMap.get("Portal"), this.areaMap.get("Middle"), this.areaMap.get("Hills")};
-			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle", "Hills"};
+			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle"};
 
 			for (int i = 0; i < scanAreas.length; i++) {
 				WorldArea destArea = scanAreas[i];
