@@ -31,6 +31,7 @@ Use the settings search bar — tab indices shift on updates. Verify changes via
 
 ## Before touching `microbot/util/`
 Read `docs/entity-guides/README.md`. Add a gotcha there when you fix an entity-assumption bug.
+Player-nullability and snapshot-read gotchas: [docs/entity-guides/players.md](docs/entity-guides/players.md).
 
 ## Docs maintenance
 - Keep root `README.md`, `docs/README.md`, and `docs/INDEX.md` short routing pages.

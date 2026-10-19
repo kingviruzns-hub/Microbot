@@ -1020,6 +1020,9 @@ public class ViruzFFABotScript extends Script
 
 	private void handleOutOfArea(Rs2PlayerModel localPlayer) {
 		WorldPoint tile = localPlayer.getWorldLocation();
+		if (tile == null) {
+			return;
+		}
 		if (this.currentArea == null) {
 			this.status = "No location selected";
 			if (this.AT_LOBBY.contains(tile)) {
@@ -1877,11 +1880,20 @@ public class ViruzFFABotScript extends Script
 				&& p.getWorldLocation() != null
 				&& distanceBetween(localPlayer, p) <= MAX_TARGET_DISTANCE
 				&& this.IN_FFA.contains(p.getWorldLocation())
-				&& p.getInteracting() instanceof Player
-				&& p.getInteracting().getName() != null
-				&& this.bluePhatNames.contains(p.getInteracting().getName().toLowerCase(Locale.ROOT).trim()))
-				.min(Comparator.comparingDouble(p -> localLoc.distanceTo(p.getWorldLocation())))
+				&& isAttackerOfBluePhat(p))
+				.min(Comparator.comparingDouble(p -> {
+					WorldPoint loc = p.getWorldLocation();
+					return loc == null ? Double.MAX_VALUE : localLoc.distanceTo(loc);
+				}))
 				.orElse(null);
+	}
+
+	private boolean isAttackerOfBluePhat(Rs2PlayerModel p) {
+		Actor interacting = p.getInteracting();
+		if (!(interacting instanceof Player)) return false;
+		String targetName = interacting.getName();
+		return targetName != null
+				&& this.bluePhatNames.contains(targetName.toLowerCase(Locale.ROOT).trim());
 	}
 
 	private boolean isLureBot(String name) {
@@ -2306,14 +2318,12 @@ public class ViruzFFABotScript extends Script
 			return;
 		}
 		String areaName = this.getAreaNameFor(this.currentArea);
-		while (localPlayer != null
-				&& localPlayer.getWorldLocation() != null
-				&& !this.currentArea.contains(localPlayer.getWorldLocation())
-				&& !this.AT_LOBBY.contains(localPlayer.getWorldLocation())
-				&& !this.SAFE_ZONE.contains(localPlayer.getWorldLocation())
-				&& !this.STUCK.contains(localPlayer.getWorldLocation())) {
-			WorldPoint currentTile = localPlayer.getWorldLocation();
-			if (currentTile == null) break;
+		WorldPoint currentTile = localPlayer.getWorldLocation();
+		while (localPlayer != null && currentTile != null
+				&& !this.currentArea.contains(currentTile)
+				&& !this.AT_LOBBY.contains(currentTile)
+				&& !this.SAFE_ZONE.contains(currentTile)
+				&& !this.STUCK.contains(currentTile)) {
 			if (this.TOWER1.contains(currentTile) || this.TOWER2.contains(currentTile)
 					|| this.SECOND_TOWER1.contains(currentTile) || this.SECOND_TOWER2.contains(currentTile)
 					|| this.SECOND_TOWER3.contains(currentTile)) {
@@ -2339,8 +2349,8 @@ public class ViruzFFABotScript extends Script
 			humanWalk(randomAreaTile(this.currentArea), fatigueF);
 			Global.sleep(2500);
 			localPlayer = Rs2Player.getLocalPlayer();
+			currentTile = localPlayer != null ? localPlayer.getWorldLocation() : null;
 		}
-		WorldPoint currentTile = localPlayer != null ? localPlayer.getWorldLocation() : null;
 		if (currentTile != null && this.currentArea.contains(currentTile)
 				&& !this.TOWER1.contains(currentTile) && !this.TOWER2.contains(currentTile)
 				&& !this.SECOND_TOWER1.contains(currentTile) && !this.SECOND_TOWER2.contains(currentTile)

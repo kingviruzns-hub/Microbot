@@ -6,6 +6,8 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import com.google.inject.Provides;
+import net.runelite.client.config.ConfigManager;
 
 import javax.inject.Inject;
 
@@ -26,6 +28,11 @@ public class ViruzFFABotPlugin extends Plugin {
 	private OverlayManager overlayManager;
 	@Inject
 	private ViruzFFABotConfig config;
+
+	@Provides
+	ViruzFFABotConfig provideConfig(ConfigManager configManager) {
+		return configManager.getConfig(ViruzFFABotConfig.class);
+	}
 
 	@Override
 	protected void startUp() throws Exception {

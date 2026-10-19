@@ -62,3 +62,4 @@ Follow existing conventional style. Bump the plugin version in the relevant `@Pl
 - `util/settings/AGENTS.md` — widget/settings debugging.
 - `docs/AGENT_SCRIPT_TOOLS.md` — runtime tooling for authoring/debugging.
 - `docs/entity-guides/` — per-entity footguns.
+- `docs/entity-guides/players.md` — local-player nullability and snapshot-read races.
