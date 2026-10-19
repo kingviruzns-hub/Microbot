@@ -395,6 +395,9 @@ dependencies {
     implementation(project(":jshell"))
     runtimeOnly("net.runelite:injected-client:${injectedClientVersionProvider.get()}")
 
+    // Add Javacord core
+    implementation("org.javacord:javacord:3.8.0")
+
     api(libs.rl.http.api)
     api(libs.rl.discord)
     api(libs.rl.awt)
