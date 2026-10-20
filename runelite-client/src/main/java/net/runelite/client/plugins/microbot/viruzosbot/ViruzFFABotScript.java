@@ -201,7 +201,6 @@ public class ViruzFFABotScript extends Script
 	private long fatigueSpikeCheckTime = System.currentTimeMillis() + 180000;
 	private double sessionFatiguePeak = 0.0;
 	private final Set<String> BLOCKED_NAMES = Set.of("Viruz SO", "Zoloroc", "vRolts", "Hans Taween");
-	private final List<String> authorizedUsers = new ArrayList<>();
 	private final String filePath = Config.getNsListFilePath();
 	private static final String BLUE_PHAT_NAME = "Blue partyhat";
 	private static final String STAFF_OF_AIR = "Staff of air";
@@ -296,129 +295,127 @@ public class ViruzFFABotScript extends Script
 		final String senderRaw = message.getName();
 		if (senderRaw == null) return;
 		final String sender = senderRaw.replace('\u00A0', ' ');
-		final String raw = message.getMessage();
 		final ChatEventType type = resolveType(message);
 		if (type == ChatEventType.CLAN_CHAT) {
 			clanMembers.add(sender.toLowerCase(Locale.ROOT).trim());
 		}
-		final boolean relevantType = type == ChatEventType.CLAN_CHAT
-				|| type == ChatEventType.CHAT_CHANNEL
-				|| type == ChatEventType.PRIVATE_INFO;
-		if (relevantType && isAuthorized(sender) && raw != null) {
-			final String text = raw.trim().toLowerCase(Locale.ROOT);
-			if (text.equals("!grab on")) {
-				chatGrabberEnabled.set(true);
-				log.info("Chat grabber: ON");
-				sendDiscordEmbed("📥 Chat grabber: **ON**");
-				return;
-			}
-			if (text.equals("!grab off")) {
-				chatGrabberEnabled.set(false);
-				log.info("Chat grabber: OFF");
-				sendDiscordEmbed("📥 Chat grabber: **OFF**");
-				return;
-			}
-			if (text.startsWith("!setthreshold ")) {
-				try {
-					int val = Integer.parseInt(raw.substring(14).trim());
-					this.setCurrentThreshold(val);
-					log.info("Threshold set to: {}", val);
-					sendDiscordEmbed("⚙️ Threshold set to: **" + val + " ms**");
-				} catch (NumberFormatException e) {
-					log.info("Invalid threshold value.");
-				}
-				return;
-			}
-			if (text.equals("!getthreshold")) {
-				int val = this.getCurrentThreshold();
-				log.info("Current threshold: {}", val);
-				sendDiscordEmbed("⚙️ Current threshold: **" + val + " ms**");
-				return;
-			}
-			if (text.startsWith("!add ")) {
-				final String nameToAdd = raw.substring(5).trim();
-				if (!nameToAdd.isEmpty()) {
-					addNameToList(nameToAdd);
-				}
-				return;
-			}
-			if (text.startsWith("!del ")) {
-				final String nameToDel = raw.substring(5).trim();
-				if (!nameToDel.isEmpty()) {
-					removeNameFromList(nameToDel);
-				}
-				return;
-			}
-			if (text.startsWith("!setarea ")) {
-				String areaStr = raw.substring(9).trim();
-				if (!areaStr.isEmpty()) {
-					String[] parts = areaStr.split(" ");
-					if (parts.length == 4) {
-						try {
-							int x1 = Integer.parseInt(parts[0]);
-							int y1 = Integer.parseInt(parts[1]);
-							int x2 = Integer.parseInt(parts[2]);
-							int y2 = Integer.parseInt(parts[3]);
-							this.currentArea = new WorldArea(x1, y1, Math.abs(x2 - x1) + 1, Math.abs(y2 - y1) + 1, 0);
-							log.info("Target area set to: {}, {}, {}, {}", x1, y1, x2, y2);
-							sendDiscordEmbed("📍 Target area set to: **" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + "**");
-						} catch (NumberFormatException e) {
-							log.info("Invalid area coordinates");
-						}
-					} else if (areaStr.equalsIgnoreCase("null") || areaStr.equalsIgnoreCase("off")) {
-						this.currentArea = null;
-						log.info("Target area cleared");
-						sendDiscordEmbed("📍 Target area cleared");
-					}
-				}
-				return;
-			}
-			if (text.startsWith("!say ")) {
-				String sayText = raw.substring(5).trim();
-				if (!sayText.isEmpty()) {
-					Rs2Keyboard.typeString(sayText);
-					Rs2Keyboard.enter();
-				}
-				return;
-			}
-			if (text.equals("!stats")) {
-				String summary = sessionTracker.generateStatusSummary();
-				String pStats = playerStats.generateStatusSummary();
-				log.info(summary);
-				log.info(pStats);
-				sendDiscordEmbed("📊 " + summary + "\n📈 " + pStats);
-				return;
-			}
-			if (text.startsWith("!profile ")) {
-				String targetName = raw.substring(9).trim();
-				if (!targetName.isEmpty()) {
-					AIAssistant.PlayerProfile profile = aiAssistant.getPlayerProfiles().get(targetName.toLowerCase());
-					if (profile != null) {
-						String info = "Profile for " + targetName + ": threat=" + String.format("%.2f", profile.threatDisplay())
-								+ " fights=" + profile.encounterCount + " foughtBack=" + profile.fightBackRatio();
-						log.info(info);
-						sendDiscordEmbed(info);
-					} else {
-						log.info("No profile found for {}", targetName);
-					}
-				}
-				return;
-			}
-			if (text.equals("!reset")) {
-				sessionTracker.resetSession();
-				log.info("Session stats reset");
-				sendDiscordEmbed("🔄 Session stats reset");
-				return;
-			}
-			if (text.startsWith("!unlist ")) {
-				final String namesToUnlist = raw.substring(8).trim();
-				if (!namesToUnlist.isEmpty()) {
-					unlistNames(namesToUnlist);
-				}
-				return;
-			}
-		}
 		grabChatMessage(message);
+	}
+
+	public void handleDiscordCommand(String raw) {
+		if (raw == null || raw.trim().isEmpty()) return;
+		final String text = raw.trim().toLowerCase(Locale.ROOT);
+		if (text.equals("!grab on")) {
+			chatGrabberEnabled.set(true);
+			log.info("Chat grabber: ON");
+			sendDiscordEmbed("📥 Chat grabber: **ON**");
+			return;
+		}
+		if (text.equals("!grab off")) {
+			chatGrabberEnabled.set(false);
+			log.info("Chat grabber: OFF");
+			sendDiscordEmbed("📥 Chat grabber: **OFF**");
+			return;
+		}
+		if (text.startsWith("!setthreshold ")) {
+			try {
+				int val = Integer.parseInt(raw.trim().substring(14).trim());
+				this.setCurrentThreshold(val);
+				log.info("Threshold set to: {}", val);
+				sendDiscordEmbed("⚙️ Threshold set to: **" + val + " ms**");
+			} catch (NumberFormatException e) {
+				log.info("Invalid threshold value.");
+			}
+			return;
+		}
+		if (text.equals("!getthreshold")) {
+			int val = this.getCurrentThreshold();
+			log.info("Current threshold: {}", val);
+			sendDiscordEmbed("⚙️ Current threshold: **" + val + " ms**");
+			return;
+		}
+		if (text.startsWith("!add ")) {
+			final String nameToAdd = raw.trim().substring(5).trim();
+			if (!nameToAdd.isEmpty()) {
+				addNameToList(nameToAdd);
+			}
+			return;
+		}
+		if (text.startsWith("!del ")) {
+			final String nameToDel = raw.trim().substring(5).trim();
+			if (!nameToDel.isEmpty()) {
+				removeNameFromList(nameToDel);
+			}
+			return;
+		}
+		if (text.startsWith("!setarea ")) {
+			String areaStr = raw.trim().substring(9).trim();
+			if (!areaStr.isEmpty()) {
+				String[] parts = areaStr.split(" ");
+				if (parts.length == 4) {
+					try {
+						int x1 = Integer.parseInt(parts[0]);
+						int y1 = Integer.parseInt(parts[1]);
+						int x2 = Integer.parseInt(parts[2]);
+						int y2 = Integer.parseInt(parts[3]);
+						this.currentArea = new WorldArea(x1, y1, Math.abs(x2 - x1) + 1, Math.abs(y2 - y1) + 1, 0);
+						log.info("Target area set to: {}, {}, {}, {}", x1, y1, x2, y2);
+						sendDiscordEmbed("📍 Target area set to: **" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + "**");
+					} catch (NumberFormatException e) {
+						log.info("Invalid area coordinates");
+					}
+				} else if (areaStr.equalsIgnoreCase("null") || areaStr.equalsIgnoreCase("off")) {
+					this.currentArea = null;
+					log.info("Target area cleared");
+					sendDiscordEmbed("📍 Target area cleared");
+				}
+			}
+			return;
+		}
+		if (text.startsWith("!say ")) {
+			String sayText = raw.trim().substring(5).trim();
+			if (!sayText.isEmpty()) {
+				Rs2Keyboard.typeString(sayText);
+				Rs2Keyboard.enter();
+			}
+			return;
+		}
+		if (text.equals("!stats")) {
+			String summary = sessionTracker.generateStatusSummary();
+			String pStats = playerStats.generateStatusSummary();
+			log.info(summary);
+			log.info(pStats);
+			sendDiscordEmbed("📊 " + summary + "\n📈 " + pStats);
+			return;
+		}
+		if (text.startsWith("!profile ")) {
+			String targetName = raw.trim().substring(9).trim();
+			if (!targetName.isEmpty()) {
+				AIAssistant.PlayerProfile profile = aiAssistant.getPlayerProfiles().get(targetName.toLowerCase());
+				if (profile != null) {
+					String info = "Profile for " + targetName + ": threat=" + String.format("%.2f", profile.threatDisplay())
+							+ " fights=" + profile.encounterCount + " foughtBack=" + profile.fightBackRatio();
+					log.info(info);
+					sendDiscordEmbed(info);
+				} else {
+					log.info("No profile found for {}", targetName);
+				}
+			}
+			return;
+		}
+		if (text.equals("!reset")) {
+			sessionTracker.resetSession();
+			log.info("Session stats reset");
+			sendDiscordEmbed("🔄 Session stats reset");
+			return;
+		}
+		if (text.startsWith("!unlist ")) {
+			final String namesToUnlist = raw.trim().substring(8).trim();
+			if (!namesToUnlist.isEmpty()) {
+				unlistNames(namesToUnlist);
+			}
+			return;
+		}
 	}
 
 	private ChatEventType resolveType(ChatMessage message) {
@@ -440,39 +437,6 @@ public class ViruzFFABotScript extends Script
 		} catch (Exception e) {
 			return ChatEventType.OTHER;
 		}
-	}
-
-	private void loadAuthorizedUsers() {
-		Path path = get(Config.getBluePhatsFilePath());
-		authorizedUsers.clear();
-		if (!Files.exists(path)) {
-			log.info("Authorization file not found at {}. Remote commands disabled.", path);
-			return;
-		}
-		try {
-			String json = Files.readString(path, StandardCharsets.UTF_8);
-			Gson gson = new Gson();
-			Type type = new TypeToken<List<String>>(){}.getType();
-			List<String> loaded = gson.fromJson(json, type);
-			if (loaded != null) {
-				for (String name : loaded) {
-					if (name != null) {
-						authorizedUsers.add(name.toLowerCase(Locale.ROOT).replace("\u00A0", " ").trim());
-					}
-				}
-				log.info("Loaded {} authorized users from bluephats.json.", authorizedUsers.size());
-			}
-		} catch (IOException e) {
-			log.info("Failed to parse bluephats.json: {}", e.getMessage());
-		}
-	}
-
-	private boolean isAuthorized(String sender) {
-		if (sender == null || authorizedUsers.isEmpty()) {
-			return false;
-		}
-		String cleanSender = sender.toLowerCase(Locale.ROOT).replace("\u00A0", " ").trim();
-		return authorizedUsers.contains(cleanSender);
 	}
 
 	private void grabChatMessage(ChatMessage message) {
@@ -839,7 +803,6 @@ public class ViruzFFABotScript extends Script
 	private void startSession() {
 		Config.load();
 		applyConfig();
-		loadAuthorizedUsers();
 		this.timer2 = new Timer();
 		initializeAreaMap();
 		this.currentArea = this.areaMap.get(this.selectedLocation);

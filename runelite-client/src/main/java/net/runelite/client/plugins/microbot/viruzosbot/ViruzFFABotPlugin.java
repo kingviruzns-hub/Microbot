@@ -28,6 +28,7 @@ public class ViruzFFABotPlugin extends Plugin {
 	private OverlayManager overlayManager;
 	@Inject
 	private ViruzFFABotConfig config;
+	private ViruzBotControl botControl;
 
 	@Provides
 	ViruzFFABotConfig provideConfig(ConfigManager configManager) {
@@ -38,12 +39,18 @@ public class ViruzFFABotPlugin extends Plugin {
 	protected void startUp() throws Exception {
 		script.setConfig(config);
 		overlayManager.add(overlay);
+		botControl = new ViruzBotControl(script);
+		botControl.start();
 		script.run();
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
 		overlayManager.remove(overlay);
+		if (botControl != null) {
+			botControl.shutdown();
+			botControl = null;
+		}
 		script.shutdown();
 	}
 
