@@ -1,13 +1,10 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
-import net.runelite.api.coords.LocalPoint;
-import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
-import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
 
 import lombok.Getter;
 
@@ -237,48 +234,6 @@ public class HumanBehavior {
         IDLE
     }
 
-    public void humanWalk(WorldPoint target, double fatigueFactor) {
-        if (target == null) return;
-        WorldPoint current = getWalkDestination();
-        if (current != null && current.distanceTo(target) < 3) return;
-
-        // Occasional hesitation before walking
-        if (ThreadLocalRandom.current().nextDouble() < 0.08 + fatigueFactor * 0.004) {
-            long pause = (long)(randInclusive(200, 1200) * (1.0 + fatigueFactor * 0.03));
-            Global.sleep(Math.toIntExact(pause));
-            if (ThreadLocalRandom.current().nextDouble() < 0.15) {
-                int lookX = randInclusive(200, 500);
-                int lookY = randInclusive(150, 350);
-                naturalMouseMovement(lookX, lookY);
-                Global.sleep(randInclusive(200, 600));
-            }
-        }
-
-        // Walk to slightly wrong tile first (correction), or directly to slightly-off tile
-        boolean willCorrect = ThreadLocalRandom.current().nextDouble() < 0.07 + fatigueFactor * 0.002;
-        if (willCorrect) {
-            WorldPoint wrongTile = target.dx(
-                    ThreadLocalRandom.current().nextInt(-2, 3)).dy(
-                    ThreadLocalRandom.current().nextInt(-2, 3));
-            if (!wrongTile.equals(target)) {
-                Rs2Walker.walkStep(wrongTile, 1);
-                long wrongDelay = (long)(randInclusive(400, 1000) * (1.0 + fatigueFactor * 0.02));
-                Global.sleep(Math.toIntExact(wrongDelay));
-            }
-        }
-
-        int dx = ThreadLocalRandom.current().nextInt(-1, 2);
-        int dy = ThreadLocalRandom.current().nextInt(-1, 2);
-        WorldPoint slightlyOff = target.dx(dx).dy(dy);
-        Rs2Walker.walkStep(slightlyOff, 1);
-        long walkDelay = (long) (randInclusive(800, 1800) * (1.0 + fatigueFactor * 0.03));
-        if (ThreadLocalRandom.current().nextDouble() < 0.06 + fatigueFactor * 0.003) {
-            long pauseBefore = randInclusive(200, 800);
-            Global.sleep(Math.toIntExact(pauseBefore));
-        }
-        Global.sleep(Math.toIntExact(walkDelay));
-    }
-
     public void naturalIdle() {
         long now = System.currentTimeMillis();
         long elapsed = now - lastNaturalMouseMove;
@@ -495,12 +450,5 @@ public class HumanBehavior {
         int yawUnits = (int) Math.round(normalized * (ANGLE_UNITS / 360.0)) % ANGLE_UNITS;
         Rs2Camera.setYaw(yawUnits);
         Rs2Camera.setPitch(pitch);
-    }
-
-    private static WorldPoint getWalkDestination() {
-        return Microbot.getClientThread().runOnClientThreadOptional(() -> {
-            LocalPoint localPoint = Microbot.getClient().getLocalDestinationLocation();
-            return localPoint == null ? null : WorldPoint.fromLocal(Microbot.getClient(), localPoint);
-        }).orElse(null);
     }
 }

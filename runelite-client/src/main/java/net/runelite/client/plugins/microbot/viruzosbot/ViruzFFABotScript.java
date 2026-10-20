@@ -1303,8 +1303,6 @@ public class ViruzFFABotScript extends Script
 
 	private long getNaturalAttackDelay() { return humanBehavior.getNaturalAttackDelay(); }
 
-	private void humanWalk(WorldPoint target, double fatigueFactor) { humanBehavior.humanWalk(target, fatigueFactor); }
-
 	private void resetSession() { humanBehavior.resetSession(); }
 
 	private int getHumanReactionTime(HumanBehavior.ReactionContext context) { return humanBehavior.getHumanReactionTime(context); }
@@ -1868,12 +1866,10 @@ public class ViruzFFABotScript extends Script
 		}
 
 		WorldPoint safeCenter = new WorldPoint(3328, 4753, 0);
-		long fatigueR = System.currentTimeMillis() - fatigueStart;
-		double fatigueF = getFatigueFactor(fatigueR);
 		for (int attempts = 0; attempts < 20 && playerExists(target) && playerExists(localPlayer); attempts++) {
 			WorldPoint lt = localPlayer.getWorldLocation();
 			if (lt != null && SAFE_ZONE.contains(lt)) return;
-			humanWalk(safeCenter, fatigueF);
+			Rs2Walker.walkTo(safeCenter, 1);
 			Global.sleep(Rs2Random.between(400, 800));
 		}
 	}
@@ -1896,13 +1892,11 @@ public class ViruzFFABotScript extends Script
 		WorldArea hillsArea = this.areaMap.get("Hills");
 		if (hillsArea == null) return;
 		WorldPoint hillsTile = randomAreaTile(hillsArea);
-		long fatigueR = System.currentTimeMillis() - fatigueStart;
-		double fatigueF = getFatigueFactor(fatigueR);
 		for (int attempts = 0; attempts < 20 && playerExists(target) && playerExists(localPlayer); attempts++) {
 			WorldPoint localTile = localPlayer.getWorldLocation();
 			if (localTile != null && hillsArea.contains(localTile)) return;
 			if (localTile != null && SAFE_ZONE.contains(localTile)) return;
-			humanWalk(hillsTile, fatigueF);
+			Rs2Walker.walkTo(hillsTile, 1);
 			Global.sleep(Rs2Random.between(400, 800));
 		}
 	}
@@ -1971,9 +1965,7 @@ public class ViruzFFABotScript extends Script
 	private boolean approachTargetIfNeeded(Rs2PlayerModel localPlayer, Rs2PlayerModel target) {
 		int maxAttempts = 15;
 		for (int attempts = 0; playerExists(target) && distanceBetween(localPlayer, target) > MAX_TARGET_DISTANCE && attempts < maxAttempts; ++attempts) {
-			long fatigueR = System.currentTimeMillis() - fatigueStart;
-			double fatigueF = this.getFatigueFactor(fatigueR);
-			humanWalk(target.getWorldLocation(), fatigueF);
+			Rs2Walker.walkTo(target.getWorldLocation(), 1);
 			this.sleepWithFatigue(200, 400);
 		}
 		return playerExists(target) && distanceBetween(localPlayer, target) <= MAX_TARGET_DISTANCE;
@@ -2051,12 +2043,12 @@ public class ViruzFFABotScript extends Script
 				case DRAG_TO_SAFE:
 					if (!isInSafeZone) {
 						this.status = "AI: Drag to safe - " + suggestion.reason;
-						this.humanWalk(new WorldPoint(3328, 4753, 0), fatigueFactor);
+						Rs2Walker.walkTo(new WorldPoint(3328, 4753, 0), 1);
 					}
 					break;
 				case RUN_AWAY:
 					this.status = "AI: Running away - " + suggestion.reason;
-					this.humanWalk(new WorldPoint(3328, 4753, 0), fatigueFactor);
+					Rs2Walker.walkTo(new WorldPoint(3328, 4753, 0), 1);
 					break;
 				case FIGHT_BACK:
 					if (this.isMagicAttack(animation) && prayersAvailable) {
@@ -2352,10 +2344,13 @@ public class ViruzFFABotScript extends Script
 			}
 			WorldPoint entranceTile = randomAreaTile(this.currentArea);
 			if (entranceTile == null) break;
-			long fatigueR2 = System.currentTimeMillis() - fatigueStart;
-			double fatigueF2 = this.getFatigueFactor(fatigueR2);
-			humanWalk(entranceTile, fatigueF2);
-			walked = true;
+			Rs2Walker.walkTo(entranceTile, 1);
+			Rs2PlayerModel afterWalk = Rs2Player.getLocalPlayer();
+			if (afterWalk != null && afterWalk.getWorldLocation() != null
+					&& this.currentArea.contains(afterWalk.getWorldLocation())) {
+				walked = true;
+				break;
+			}
 			this.sleepForArea(areaName);
 		}
 		if (walked) {
@@ -3138,12 +3133,10 @@ public class ViruzFFABotScript extends Script
 		int dy = Rs2Random.between(-2, 2);
 		if (dx == 0 && dy == 0) dx = 1;
 		WorldPoint target = current.dx(dx).dy(dy);
-		long fatigueR = System.currentTimeMillis() - fatigueStart;
-		double fatigueF = this.getFatigueFactor(fatigueR);
-		humanWalk(target, fatigueF * 0.3);
+		Rs2Walker.walkTo(target, 1);
 		Global.sleep(Rs2Random.between(600, 1500));
 		if (Rs2Random.between(0, 100) < 50) {
-			humanWalk(current, fatigueF * 0.2);
+			Rs2Walker.walkTo(current, 1);
 			Global.sleep(Rs2Random.between(500, 1200));
 		}
 	}
