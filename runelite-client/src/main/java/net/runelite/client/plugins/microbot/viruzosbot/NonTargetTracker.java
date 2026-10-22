@@ -190,34 +190,6 @@ public class NonTargetTracker {
         return entries.size();
     }
 
-    public void markAsQuit(String playerName, long lastSeenMs) {
-        if (playerName == null || playerName.isEmpty()) return;
-        String key = playerName.toLowerCase(Locale.ROOT).trim();
-        LastSeenEntry entry = entries.get(key);
-        if (entry == null) {
-            entry = new LastSeenEntry(playerName, 0, 0, 0, lastSeenMs > 0 ? lastSeenMs : System.currentTimeMillis(), "Unknown", 0);
-            entries.put(key, entry);
-        }
-        if (lastSeenMs > entry.lastSeenMs) {
-            entry.lastSeenMs = lastSeenMs;
-        }
-        String quitDate = java.time.Instant.ofEpochMilli(entry.lastSeenMs)
-                .atZone(java.time.ZoneId.systemDefault())
-                .toLocalDate()
-                .toString();
-        entry.setStatus("Quit: " + quitDate);
-        save();
-    }
-
-    public void clearQuitStatus(String playerName) {
-        if (playerName == null || playerName.isEmpty()) return;
-        String key = playerName.toLowerCase(Locale.ROOT).trim();
-        LastSeenEntry entry = entries.get(key);
-        if (entry == null || entry.getStatus() == null || !entry.getStatus().startsWith("Quit")) return;
-        entry.setStatus(null);
-        save();
-    }
-
     public Map<String, LastSeenEntry> getEntries() {
         return Collections.unmodifiableMap(entries);
     }

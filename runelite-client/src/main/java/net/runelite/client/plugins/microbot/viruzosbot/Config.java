@@ -18,7 +18,7 @@ public class Config {
     static {
         String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot";
         DEFAULT_CONFIG_PATH = basePath + File.separator + "config.properties";
-        CONFIG_FILE_PATH = System.getProperty("config.path", DEFAULT_CONFIG_PATH);
+        CONFIG_FILE_PATH = System.getProperty("C:\\Users\\4Twen\\.microbot", DEFAULT_CONFIG_PATH);
         FILE_PATH = basePath + File.separator + "nslist.txt";
         load();
     }
