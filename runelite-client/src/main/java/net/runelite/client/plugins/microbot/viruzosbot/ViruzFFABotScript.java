@@ -75,7 +75,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.0";
+	static final String VERSION = "1.0.2";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -240,6 +240,7 @@ public class ViruzFFABotScript extends Script
 	private long nextRandomEventCheckMs = 0L;
 	private static final long RANDOM_EVENT_CHECK_INTERVAL_MS = 5_000L;
 	private long nextAttackListReloadAtMs = 0L;
+	private volatile boolean reloadNsListRequested = false;
 	double energyBoost = 0.0;
 	private long lastEnergyBoostTime = System.currentTimeMillis();
 	private long nextEnergyBoostCheck = System.currentTimeMillis() + 60000;
@@ -716,6 +717,10 @@ public class ViruzFFABotScript extends Script
 
 	private void onLoop() {
 		try {
+			if (this.reloadNsListRequested) {
+				this.reloadNsListRequested = false;
+				this.reloadNsListNow();
+			}
 			Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
 			if (localPlayer == null) return;
 			WorldPoint localTile = localPlayer.getWorldLocation();
@@ -3858,6 +3863,40 @@ public class ViruzFFABotScript extends Script
 		return getPlayers(p -> p != null && p != local
 				&& p.getInteracting() instanceof Player
 				&& p.getInteracting() == localPlayer).findFirst().orElse(null);
+	}
+
+	public void resetFatigue() {
+		long now = System.currentTimeMillis();
+		this.fatigueStart = now;
+		this.fatigueSpikeEndTime = 0L;
+		this.fatigueSpikeMagnitude = 0.0;
+		this.performanceStreakEndTime = 0L;
+		this.performanceStreakBoost = 0.0;
+		this.energyBoost = 0.0;
+		this.lastEnergyBoostTime = now;
+		this.nextEnergyBoostCheck = now + 60000;
+		this.nextFatigueCheck = now + 60000;
+		this.nextUltradianUpdateMs = now + Rs2Random.between(600000, 1200000);
+		this.fatigueSpikeCheckTime = now + 180000;
+		this.sessionFatiguePeak = 0.0;
+		this.actionsSinceBreak = 0;
+		this.forcedBreakPending = false;
+		this.forcedBreakUntilMs = 0L;
+		this.nextAfkBreakTime = now + Rs2Random.between(1800000, 3600000);
+		this.status = "Fatigue reset";
+		this.log("Fatigue manually reset");
+	}
+
+	public void reloadNsList() {
+		this.reloadNsListRequested = true;
+	}
+
+	private void reloadNsListNow() {
+		this.readMainUserFile();
+		this.loadList();
+		this.nextAttackListReloadAtMs = System.currentTimeMillis() + ATTACK_LIST_RELOAD_INTERVAL_MS;
+		this.status = "Reloaded nslist (" + this.attackSet.size() + " names)";
+		this.log("Manually reloaded nslist.txt: " + this.attackSet.size() + " names");
 	}
 
 	public int getTotalActions() {

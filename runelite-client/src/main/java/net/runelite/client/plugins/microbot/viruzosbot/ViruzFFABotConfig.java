@@ -1,6 +1,7 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
 import net.runelite.client.config.Config;
+import net.runelite.client.config.ConfigButton;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
@@ -85,4 +86,15 @@ public interface ViruzFFABotConfig extends Config {
 
     @ConfigItem(keyName = "whitelist", name = "Whitelist", description = "Players to whitelist on start (comma-separated)", position = 2, section = playerLists)
     default String whitelist() { return ""; }
+
+    @ConfigSection(name = "Actions", description = "Manual actions", position = 3)
+    String actions = "actions";
+
+    @SuppressWarnings("unused")
+    @ConfigItem(keyName = "resetFatigue", name = "Reset fatigue", description = "Clear accumulated fatigue and recovery bonuses", position = 0, section = actions)
+    default ConfigButton resetFatigue() { return new ConfigButton(); }
+
+    @SuppressWarnings("unused")
+    @ConfigItem(keyName = "reloadNsList", name = "Reload nslist", description = "Reload targets from nslist.txt", position = 1, section = actions)
+    default ConfigButton reloadNsList() { return new ConfigButton(); }
 }

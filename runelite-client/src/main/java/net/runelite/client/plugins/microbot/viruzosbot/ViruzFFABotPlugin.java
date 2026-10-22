@@ -3,6 +3,7 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
@@ -27,7 +28,7 @@ public class ViruzFFABotPlugin extends Plugin {
 	@Inject
 	private ViruzFFABotScript script;
 	@Inject
-	private ViruzFFABotOverlay overlay;
+	private ViruzFFABotHudOverlay hudOverlay;
 	@Inject
 	private OverlayManager overlayManager;
 	@Inject
@@ -41,18 +42,32 @@ public class ViruzFFABotPlugin extends Plugin {
 	@Override
 	protected void startUp() throws Exception {
 		script.setConfig(config);
-		overlayManager.add(overlay);
+		overlayManager.add(hudOverlay);
 		script.run();
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
-		overlayManager.remove(overlay);
+		overlayManager.remove(hudOverlay);
 		script.shutdown();
 	}
 
 	@Subscribe
 	public void onChatMessage(ChatMessage event) {
 		script.handleChatMessage(event);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event) {
+		if (!ViruzFFABotConfig.configGroup.equals(event.getGroup())) {
+			return;
+		}
+
+		String key = event.getKey();
+		if ("resetFatigue".equals(key)) {
+			script.resetFatigue();
+		} else if ("reloadNsList".equals(key)) {
+			script.reloadNsList();
+		}
 	}
 }
