@@ -28,7 +28,6 @@ import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.equipment.Rs2Equipment;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
-import net.runelite.client.plugins.microbot.util.keyboard.Rs2Keyboard;
 import net.runelite.client.plugins.microbot.util.menu.NewMenuEntry;
 import net.runelite.client.plugins.microbot.util.misc.Rs2UiHelper;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
@@ -37,6 +36,7 @@ import net.runelite.client.plugins.microbot.util.prayer.Rs2Prayer;
 import net.runelite.client.plugins.microbot.util.prayer.Rs2PrayerEnum;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
+import net.runelite.client.plugins.microbot.util.walker.WalkerState;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
@@ -264,6 +264,10 @@ public class ViruzFFABotScript extends Script
 	final PlayerStats playerStats = new PlayerStats();
 	private long nextNonTargetScanMs = 0L;
 	private long noValidTargetCooldownUntilMs = 0L;
+	private static final int MAX_SAFE_ZONE_RETURN_ATTEMPTS = 8;
+	private boolean safeZoneEscapeActive = false;
+	private WorldPoint safeZoneReturnTarget = null;
+	private int safeZoneReturnAttempts = 0;
 
 	private static final long MAX_SESSION_MS = 5L * 60L * 60L * 1000L;
 	private static final long FORCED_BREAK_MIN_MS = 5L * 60L * 1000L;
@@ -300,122 +304,6 @@ public class ViruzFFABotScript extends Script
 			clanMembers.add(sender.toLowerCase(Locale.ROOT).trim());
 		}
 		grabChatMessage(message);
-	}
-
-	public void handleDiscordCommand(String raw) {
-		if (raw == null || raw.trim().isEmpty()) return;
-		final String text = raw.trim().toLowerCase(Locale.ROOT);
-		if (text.equals("!grab on")) {
-			chatGrabberEnabled.set(true);
-			log.info("Chat grabber: ON");
-			sendDiscordEmbed("📥 Chat grabber: **ON**");
-			return;
-		}
-		if (text.equals("!grab off")) {
-			chatGrabberEnabled.set(false);
-			log.info("Chat grabber: OFF");
-			sendDiscordEmbed("📥 Chat grabber: **OFF**");
-			return;
-		}
-		if (text.startsWith("!setthreshold ")) {
-			try {
-				int val = Integer.parseInt(raw.trim().substring(14).trim());
-				this.setCurrentThreshold(val);
-				log.info("Threshold set to: {}", val);
-				sendDiscordEmbed("⚙️ Threshold set to: **" + val + " ms**");
-			} catch (NumberFormatException e) {
-				log.info("Invalid threshold value.");
-			}
-			return;
-		}
-		if (text.equals("!getthreshold")) {
-			int val = this.getCurrentThreshold();
-			log.info("Current threshold: {}", val);
-			sendDiscordEmbed("⚙️ Current threshold: **" + val + " ms**");
-			return;
-		}
-		if (text.startsWith("!add ")) {
-			final String nameToAdd = raw.trim().substring(5).trim();
-			if (!nameToAdd.isEmpty()) {
-				addNameToList(nameToAdd);
-			}
-			return;
-		}
-		if (text.startsWith("!del ")) {
-			final String nameToDel = raw.trim().substring(5).trim();
-			if (!nameToDel.isEmpty()) {
-				removeNameFromList(nameToDel);
-			}
-			return;
-		}
-		if (text.startsWith("!setarea ")) {
-			String areaStr = raw.trim().substring(9).trim();
-			if (!areaStr.isEmpty()) {
-				String[] parts = areaStr.split(" ");
-				if (parts.length == 4) {
-					try {
-						int x1 = Integer.parseInt(parts[0]);
-						int y1 = Integer.parseInt(parts[1]);
-						int x2 = Integer.parseInt(parts[2]);
-						int y2 = Integer.parseInt(parts[3]);
-						this.currentArea = new WorldArea(x1, y1, Math.abs(x2 - x1) + 1, Math.abs(y2 - y1) + 1, 0);
-						log.info("Target area set to: {}, {}, {}, {}", x1, y1, x2, y2);
-						sendDiscordEmbed("📍 Target area set to: **" + x1 + ", " + y1 + ", " + x2 + ", " + y2 + "**");
-					} catch (NumberFormatException e) {
-						log.info("Invalid area coordinates");
-					}
-				} else if (areaStr.equalsIgnoreCase("null") || areaStr.equalsIgnoreCase("off")) {
-					this.currentArea = null;
-					log.info("Target area cleared");
-					sendDiscordEmbed("📍 Target area cleared");
-				}
-			}
-			return;
-		}
-		if (text.startsWith("!say ")) {
-			String sayText = raw.trim().substring(5).trim();
-			if (!sayText.isEmpty()) {
-				Rs2Keyboard.typeString(sayText);
-				Rs2Keyboard.enter();
-			}
-			return;
-		}
-		if (text.equals("!stats")) {
-			String summary = sessionTracker.generateStatusSummary();
-			String pStats = playerStats.generateStatusSummary();
-			log.info(summary);
-			log.info(pStats);
-			sendDiscordEmbed("📊 " + summary + "\n📈 " + pStats);
-			return;
-		}
-		if (text.startsWith("!profile ")) {
-			String targetName = raw.trim().substring(9).trim();
-			if (!targetName.isEmpty()) {
-				AIAssistant.PlayerProfile profile = aiAssistant.getPlayerProfiles().get(targetName.toLowerCase());
-				if (profile != null) {
-					String info = "Profile for " + targetName + ": threat=" + String.format("%.2f", profile.threatDisplay())
-							+ " fights=" + profile.encounterCount + " foughtBack=" + profile.fightBackRatio();
-					log.info(info);
-					sendDiscordEmbed(info);
-				} else {
-					log.info("No profile found for {}", targetName);
-				}
-			}
-			return;
-		}
-		if (text.equals("!reset")) {
-			sessionTracker.resetSession();
-			log.info("Session stats reset");
-			sendDiscordEmbed("🔄 Session stats reset");
-			return;
-		}
-		if (text.startsWith("!unlist ")) {
-			final String namesToUnlist = raw.trim().substring(8).trim();
-			if (!namesToUnlist.isEmpty()) {
-				unlistNames(namesToUnlist);
-			}
-			return;
-		}
 	}
 
 	private ChatEventType resolveType(ChatMessage message) {
@@ -761,9 +649,6 @@ public class ViruzFFABotScript extends Script
 		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
 		return local != null ? local.getWorldLocation() : null;
 	}
-	private void setCurrentThreshold(int val) { this.currentThreshold = val; }
-	private int getCurrentThreshold() { return this.currentThreshold; }
-
 	private long lastInCombatMs = 0L;
 	private boolean wasInFfaArea = false;
 	private long postCombatPauseUntilMs = 0L;
@@ -841,6 +726,8 @@ public class ViruzFFABotScript extends Script
 			}
 			this.onAction();
 
+			final boolean inSafeZone = this.handleSafeZoneEscape(localPlayer);
+
 			if (this.isDistracted() && !isPlayerInCombat(localPlayer) && this.isAtDesignatedArea(localPlayer)) {
 				this.handleDistraction();
 			}
@@ -884,7 +771,7 @@ public class ViruzFFABotScript extends Script
 			if (now >= this.nextActionTime) {
 				this.setNextPreventLogout();
 			}
-			if (now >= this.nextAntiBanAtMs && !isPlayerInCombat(localPlayer) && !this.AT_LOBBY.contains(localTile) && this.isAtDesignatedArea(localPlayer)) {
+			if (now >= this.nextAntiBanAtMs && !isPlayerInCombat(localPlayer) && !this.AT_LOBBY.contains(localTile) && this.isAtDesignatedArea(localPlayer) && !inSafeZone) {
 				this.performAntiban();
 				long fatiguePenalty = (long) (this.getFatigueFactor(now - sessionStartMs) * 500L);
 				this.nextAntiBanAtMs = now + Rs2Random.between((int) ANTIBAN_MIN_INTERVAL_MS, (int) ANTIBAN_MAX_INTERVAL_MS) + fatiguePenalty;
@@ -893,18 +780,20 @@ public class ViruzFFABotScript extends Script
 			if (!this.AT_LOBBY.contains(localTile)) {
 				this.avoidObstacles();
 			}
-			if ((this.currentArea == null || !this.currentArea.contains(localTile)) && !this.STUCK.contains(localTile)) {
-				this.handleOutOfArea(localPlayer);
-			} else if (this.STUCK.contains(localTile)) {
-				wasInFfaArea = false;
-				this.sleepWithFatigue(1000, 3000);
-				if (Rs2Random.between(0, 100) < 30) {
-					this.performAntiban();
+			if (!inSafeZone) {
+				if ((this.currentArea == null || !this.currentArea.contains(localTile)) && !this.STUCK.contains(localTile)) {
+					this.handleOutOfArea(localPlayer);
+				} else if (this.STUCK.contains(localTile)) {
+					wasInFfaArea = false;
+					this.sleepWithFatigue(1000, 3000);
+					if (Rs2Random.between(0, 100) < 30) {
+						this.performAntiban();
+					}
+					this.clickPortal();
+				} else if (this.IN_FFA.contains(localTile)) {
+					wasInFfaArea = true;
+					this.handleInFFA(localPlayer);
 				}
-				this.clickPortal();
-			} else if (this.IN_FFA.contains(localTile)) {
-				wasInFfaArea = true;
-				this.handleInFFA(localPlayer);
 			}
 			aiAssistant.onTick();
 			if (now >= nextAutoRetaliateCheckMs && !autoRetaliateOffVerified) {
@@ -1010,11 +899,7 @@ public class ViruzFFABotScript extends Script
 				this.clickPortal();
 			}
 		} else if (this.SAFE_ZONE.contains(tile)) {
-			if (lastInCombatMs > 0) {
-				sessionTracker.recordTargetRan();
-				lastInCombatMs = 0L;
-			}
-			this.gotoArea();
+			this.handleSafeZoneEscape(localPlayer);
 		} else if (this.isFreeRoamEnabled()) {
 			if (!this.FREE_ROAM_AREA.contains(tile) && !this.FREE_ROAM_AREA_2.contains(tile)) {
 				this.waitBeforeWalkBack();
@@ -1040,6 +925,109 @@ public class ViruzFFABotScript extends Script
 				|| this.STUCK.contains(tile)
 				|| this.currentArea.contains(tile);
 	}
+
+	/**
+	 * Detects being lured or dragged into the SAFE_ZONE (a spot where fights cannot happen) and walks
+	 * back to {@link #currentArea}. The walk is driven one step per tick through
+	 * {@link Rs2Walker#walkStep(WorldPoint, int)} so the script stays responsive and can re-check the
+	 * player position between steps. Returns true while the escape is in progress so the caller can skip
+	 * the regular combat and area handling for the current tick.
+	 */
+	private boolean handleSafeZoneEscape(Rs2PlayerModel localPlayer) {
+		if (localPlayer == null) {
+			return false;
+		}
+		WorldPoint tile = localPlayer.getWorldLocation();
+		if (tile == null || !this.SAFE_ZONE.contains(tile)) {
+			if (this.safeZoneEscapeActive) {
+				this.safeZoneEscapeActive = false;
+				this.resetSafeZoneReturn();
+			}
+			return false;
+		}
+		if (lastInCombatMs > 0) {
+			sessionTracker.recordTargetRan();
+			lastInCombatMs = 0L;
+		}
+		if (this.currentArea == null) {
+			this.status = "Safe zone - no area selected";
+			this.sleepWithFatigue(500, 1200);
+			return true;
+		}
+		if (isPlayerInCombat(localPlayer)) {
+			this.status = "In combat in safe zone";
+			this.sleepWithFatigue(300, 800);
+			return true;
+		}
+		final String areaName = this.getAreaNameFor(this.currentArea);
+		if (!this.safeZoneEscapeActive) {
+			this.safeZoneEscapeActive = true;
+			this.safeZoneReturnAttempts = 0;
+			this.safeZoneReturnTarget = this.pickSafeZoneReturnTarget();
+			this.status = "Lured into safe zone - walking back to " + areaName;
+			this.log(this.status);
+			sessionTracker.recordAntiLure();
+			sendDiscordEmbed("Dragged into safe zone, walking back to " + areaName);
+		}
+		if (this.safeZoneReturnTarget == null) {
+			this.safeZoneReturnTarget = this.pickSafeZoneReturnTarget();
+		}
+		final WalkerState state = Rs2Walker.walkStep(this.safeZoneReturnTarget, 1);
+		switch (state) {
+			case ARRIVED:
+				if (this.currentArea.contains(tile)) {
+					this.resetSafeZoneReturn();
+					this.safeZoneEscapeActive = false;
+					this.lastSelectedLocationWalkFinishedAtMs = System.currentTimeMillis();
+					this.status = "Back in " + areaName;
+					this.log(this.status);
+				} else {
+					++this.safeZoneReturnAttempts;
+					this.safeZoneReturnTarget = this.pickSafeZoneReturnTarget();
+				}
+				break;
+			case UNREACHABLE:
+			case EXIT:
+				++this.safeZoneReturnAttempts;
+				this.safeZoneReturnTarget = this.pickSafeZoneReturnTarget();
+				this.log("Safe zone escape could not reach target, retry " + this.safeZoneReturnAttempts);
+				break;
+			default:
+				break;
+		}
+		if (this.safeZoneReturnAttempts >= MAX_SAFE_ZONE_RETURN_ATTEMPTS) {
+			this.safeZoneReturnAttempts = 0;
+			this.safeZoneReturnTarget = null;
+			final WorldPoint fallback = this.pickSafeZoneReturnTarget();
+			if (fallback != null) {
+				this.status = "Walking back to " + areaName;
+				Rs2Walker.walkTo(fallback, 1);
+			}
+			Rs2Walker.setTarget(null, "viruz: safe zone escape finished");
+		}
+		this.sleepWithFatigue(100, 300);
+		return true;
+	}
+
+	private WorldPoint pickSafeZoneReturnTarget() {
+		if (this.currentArea == null) {
+			return null;
+		}
+		for (int attempt = 0; attempt < 10; ++attempt) {
+			WorldPoint candidate = randomAreaTile(this.currentArea);
+			if (candidate != null && Rs2Walker.isWalkableInCollisionMap(candidate)) {
+				return candidate;
+			}
+		}
+		return randomAreaTile(this.currentArea);
+	}
+
+	private void resetSafeZoneReturn() {
+		this.safeZoneReturnAttempts = 0;
+		this.safeZoneReturnTarget = null;
+		Rs2Walker.setTarget(null, "viruz: safe zone escape finished");
+	}
+
 
 	private void handleInFFA(Rs2PlayerModel localPlayer) {
 		if (!isPlayerInCombat(localPlayer)) {
@@ -2360,8 +2348,10 @@ public class ViruzFFABotScript extends Script
 
 	private int getMaxAttempts(String areaName) {
 		switch (areaName) {
-			case "Middle":
+			case "Portal":
 				return 2;
+			case "Middle":
+				return 3;
 			case "Hills single":
 			case "Lava single":
 			case "Pond single":

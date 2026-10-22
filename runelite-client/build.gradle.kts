@@ -572,6 +572,45 @@ val microbotReleaseJar = tasks.register<Copy>("microbotReleaseJar") {
 
 tasks.assemble { dependsOn(microbotReleaseJar) }
 
+// Standalone external Microbot plugin jar for the ViruzOSBot FFA bot.
+// Loaded at runtime by MicrobotPluginManager from ~/.runelite/microbot-plugins/.
+// Only the plugin's own classes are packaged; core client/Microbot classes are
+// provided by the parent classloader (PluginJarClassLoader delegates to it).
+val microbotPluginInternalName = "viruzosbot"
+val microbotPluginVersion = "1.0.0"
+
+val viruzosbotPluginJar = tasks.register<Jar>("viruzosbotPluginJar") {
+    dependsOn(tasks.named("classes"))
+
+    archiveFileName = "$microbotPluginInternalName.jar"
+    destinationDirectory = layout.buildDirectory.dir("libs")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(sourceSets.main.get().output) {
+        include("net/runelite/client/plugins/microbot/viruzosbot/**")
+    }
+
+    from(layout.buildDirectory.file("tmp/viruzosbotPluginJar/runelite_plugin.json")) {
+        into("")
+    }
+
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "**/module-info.class")
+
+    doFirst {
+        val jsonFile = layout.buildDirectory.file("tmp/viruzosbotPluginJar/runelite_plugin.json").get().asFile
+        jsonFile.parentFile.mkdirs()
+        jsonFile.writeText(
+            """{"plugins":["net.runelite.client.plugins.microbot.viruzosbot.ViruzFFABotPlugin"],""" +
+                """"internalName":"$microbotPluginInternalName",""" +
+                """"displayName":"Viruz FFA Bot",""" +
+                """"version":"$microbotPluginVersion",""" +
+                """"author":"Viruz Scripts",""" +
+                """"description":"Clanwars FFA automation bot",""" +
+                """"tags":["microbot","pvp","clanwars","minigame","viruz"]}"""
+        )
+    }
+}
+
 pmd {
     toolVersion = "7.2.0"
     ruleSetFiles("./pmd-ruleset.xml")
