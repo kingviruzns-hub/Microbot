@@ -7,7 +7,7 @@ import net.runelite.api.Point;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.plugins.microbot.Microbot;
-import net.runelite.client.plugins.microbot.util.gameobject.Rs2GameObject;
+import net.runelite.client.plugins.microbot.util.coords.Rs2WorldArea;
 import net.runelite.client.plugins.microbot.util.tile.Rs2Tile;
 import net.runelite.client.plugins.microbot.api.IEntity;
 import net.runelite.client.plugins.microbot.api.boat.Rs2BoatCache;
@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
+import java.util.List;
 
 import static net.runelite.client.plugins.microbot.util.Global.sleepUntil;
 
@@ -110,15 +111,17 @@ public class Rs2TileObjectModel implements TileObject, IEntity {
     }
 
     public String getName() {
-        return Microbot.getClientThread().invoke(() -> {
+        return Microbot.getClientThread().runOnClientThreadOptional(() -> {
             ObjectComposition composition = Microbot.getClient().getObjectDefinition(tileObject.getId());
+            if (composition == null)
+                return null;
             if (composition.getImpostorIds() != null) {
                 composition = composition.getImpostor();
             }
             if (composition == null)
                 return null;
             return Rs2UiHelper.stripColTags(composition.getName());
-        });
+        }).orElse(null);
     }
 
     @Override
@@ -167,13 +170,15 @@ public class Rs2TileObjectModel implements TileObject, IEntity {
     }
 
     public ObjectComposition getObjectComposition() {
-        return Microbot.getClientThread().invoke(() -> {
+        return Microbot.getClientThread().runOnClientThreadOptional(() -> {
             ObjectComposition composition = Microbot.getClient().getObjectDefinition(tileObject.getId());
+            if (composition == null)
+                return null;
             if (composition.getImpostorIds() != null) {
                 composition = composition.getImpostor();
             }
             return composition;
-        });
+        }).orElse(null);
     }
 
     @Override
@@ -201,11 +206,26 @@ public class Rs2TileObjectModel implements TileObject, IEntity {
         // tile can be. You interact with a booth, a tree or a rock from an adjacent tile and never
         // from the tile it occupies, so a solid object's own tile is never walkable and the
         // IEntity default (Rs2Reachable on getWorldLocation()) answers "no" for every one of them.
-        // Rs2GameObject.isReachable asks the right question: it builds the object's WorldArea from
-        // its size, takes the interactable tiles around it, and looks for one that is walkable and
-        // reachable. Reused here rather than reimplemented so the two paths cannot drift.
+        // Build the object's WorldArea from its size, take the interactable tiles around it, and
+        // look for one that is walkable and reachable.
         if (tileObject instanceof GameObject) {
-            return Rs2GameObject.isReachable((GameObject) tileObject);
+            WorldPoint swTile = getWorldLocation();
+            if (swTile == null) {
+                return false;
+            }
+            GameObject gameObject = (GameObject) tileObject;
+            Rs2WorldArea objectArea = new Rs2WorldArea(
+                    swTile.getX(), swTile.getY(), gameObject.sizeX(), gameObject.sizeY(), swTile.getPlane());
+            List<WorldPoint> interactablePoints = objectArea.getInteractable();
+            if (interactablePoints.isEmpty()) {
+                interactablePoints = objectArea.offset(1).toWorldPointList();
+                interactablePoints.removeIf(objectArea::contains);
+            }
+            return interactablePoints.stream()
+                    .filter(Rs2Tile::isWalkable)
+                    .filter(Rs2Tile::isTileReachable)
+                    .findFirst()
+                    .isPresent();
         }
 
         return Rs2Tile.isTileObjectReachable(tileObject);
@@ -257,6 +277,10 @@ public class Rs2TileObjectModel implements TileObject, IEntity {
             if (action != null) {
                 //performance improvement to only get compoisiton if action has been specified
                 var objComp = getObjectComposition();
+                if (objComp == null) {
+                    log.warn("Failed to interact with object {} - composition unavailable", getId());
+                    return false;
+                }
                 String[] actions;
                 if (objComp.getImpostorIds() != null && objComp.getImpostor() != null) {
                     actions = objComp.getImpostor().getActions();

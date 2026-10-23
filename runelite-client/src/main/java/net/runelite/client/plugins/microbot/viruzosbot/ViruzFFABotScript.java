@@ -3156,7 +3156,7 @@ public class ViruzFFABotScript extends Script
 					return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
 				})
 				.within(6)
-				.first();
+				.firstOnClientThread();
 		if (deco == null) return;
 		if (tileObjectHasAction(deco, "Examine")) {
 			deco.click("Examine");
@@ -3279,7 +3279,7 @@ public class ViruzFFABotScript extends Script
 				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
 				.where(o -> tileObjectHasAction(o, "Climb-up") || tileObjectHasAction(o, "Climb-down"))
 				.within(8)
-				.first();
+				.firstOnClientThread();
 		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
 		if (obstacle == null || localPlayer == null) return;
 		WorldPoint lt = localPlayer.getWorldLocation();
