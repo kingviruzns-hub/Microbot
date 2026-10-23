@@ -75,7 +75,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.2";
+	static final String VERSION = "1.0.3";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -836,7 +836,7 @@ public class ViruzFFABotScript extends Script
 		this.areaMap.put("Hills single", new WorldArea(3328, 4797, 5, 3, 0));
 		this.areaMap.put("Lava single", new WorldArea(3313, 4797, 6, 3, 0));
 		this.areaMap.put("Pond single", new WorldArea(3343, 4797, 9, 3, 0));
-		this.areaMap.put("Hills", new WorldArea(3325, 4813, 11, 8, 0));
+		this.areaMap.put("Hills", new WorldArea(3325, 4805, 10, 8, 0));
 		this.areaMap.put("Pond", new WorldArea(3346, 4800, 7, 16, 0));
 		this.areaMap.put("Lava", new WorldArea(3313, 4800, 6, 16, 0));
 	}
@@ -2218,7 +2218,7 @@ public class ViruzFFABotScript extends Script
 
 	private void waitBeforeWalkBack() {
 		this.status = "Waiting";
-		this.sleepWithFatigue(1500, 3000);
+		this.sleepWithFatigue(50, 150);
 	}
 
 	private void antiLure() {
@@ -2255,7 +2255,7 @@ public class ViruzFFABotScript extends Script
 				sendDiscordEmbed("Detected possible drag/lure, returning to " + areaName);
 			}
 			Rs2Walker.walkTo(randomAreaTile(this.currentArea));
-			Global.sleep(2500);
+			Global.sleep(300);
 			localPlayer = Rs2Player.getLocalPlayer();
 			currentTile = localPlayer != null ? localPlayer.getWorldLocation() : null;
 		}
