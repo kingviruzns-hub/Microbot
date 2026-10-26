@@ -671,7 +671,16 @@ public class ViruzFFABotScript extends Script
 					sendDiscordEmbed("✅ Script started");
 				}
 				onLoop();
-			} catch (Exception ex) {
+			} catch (Throwable ex) {
+				if (ex instanceof InterruptedException || (ex.getCause() instanceof InterruptedException)) {
+					Thread.currentThread().interrupt();
+					log.info("Script interrupted, shutting down");
+					if (mainScheduledFuture != null) {
+						mainScheduledFuture.cancel(true);
+					}
+					shutdown();
+					return;
+				}
 				log.info("Error in main loop: {}", ex.getMessage());
 			}
 		}, 0, 600, TimeUnit.MILLISECONDS);
@@ -726,8 +735,16 @@ public class ViruzFFABotScript extends Script
 			WorldPoint localTile = localPlayer.getWorldLocation();
 			if (localTile == null) return;
 			if (localTile.getPlane() == 1) {
-				this.climbdownStairs();
-				this.clickPortal();
+				try {
+					this.climbdownStairs();
+					this.clickPortal();
+				} catch (Throwable t) {
+					if (t instanceof InterruptedException || (t.getCause() instanceof InterruptedException)) {
+						Thread.currentThread().interrupt();
+						return;
+					}
+					throw t;
+				}
 			}
 			this.onAction();
 
@@ -819,7 +836,12 @@ public class ViruzFFABotScript extends Script
 			int delay = (int) Math.max(100, Rs2Random.between(250, 500) * (1.0 - aiAssistant.getPlayerProfiles().size() * 0.001));
 			delay = Math.min(delay, 600);
 			this.sleepWithFatigue(delay, delay);
-		} catch (Exception ex) {
+		} catch (Throwable ex) {
+			if (ex instanceof InterruptedException || (ex.getCause() instanceof InterruptedException)) {
+				Thread.currentThread().interrupt();
+				this.log("onLoop interrupted");
+				throw ex;
+			}
 			this.log("Error in onLoop: " + ex.getMessage());
 			java.io.StringWriter sw = new java.io.StringWriter();
 			java.io.PrintWriter pw = new java.io.PrintWriter(sw);
@@ -854,9 +876,6 @@ public class ViruzFFABotScript extends Script
 		while (System.currentTimeMillis() < breakEndTime) {
 			int sleepTime = Rs2Random.between(5000, 15000);
 			this.sleepWithFatigue(sleepTime, sleepTime + 2000);
-			if (Rs2Random.between(0, 100) < 3 + (int) (fatigueFactor * 0.2)) {
-				this.randomCameraRotation();
-			}
 			this.status = "AFK break: " + ((breakEndTime - System.currentTimeMillis()) / 1000L) + "s left";
 		}
 		double recoveryFactor = 0.5 + (fatigueFactor / 20.0) * 0.3;
@@ -1076,9 +1095,7 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 		} else {
-			if (!isPlayerInCombat(localPlayer) && Rs2Random.between(0, 100) < 2) {
-				this.idleGaze();
-			}
+
 			this.status = "Afking";
 		}
 		if (this.isPrayerOffEnabled() && !isPlayerInCombat(localPlayer)) {
@@ -2276,32 +2293,40 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void clickPortal() {
-		this.resetSession();
-		if (this.currentArea == null) {
-			return;
-		}
-		this.waiting();
-		int randomPrayers = ThreadLocalRandom.current().nextInt(2);
-		if (randomPrayers == 0 && this.quickprayersEnabled && !this.switchPrayersEnabled) {
-			this.status = "Turning on prayers";
+		try {
+			this.resetSession();
+			if (this.currentArea == null) {
+				return;
+			}
+			this.waiting();
+			int randomPrayers = ThreadLocalRandom.current().nextInt(2);
+			if (randomPrayers == 0 && this.quickprayersEnabled && !this.switchPrayersEnabled) {
+				this.status = "Turning on prayers";
+				this.log(this.status);
+				this.quickPrayer();
+			}
+			this.status = "Clicking portal";
 			this.log(this.status);
-			this.quickPrayer();
-		}
-		this.status = "Clicking portal";
-		this.log(this.status);
-		sendDiscordEmbed("Entering " + this.getAreaNameFor(this.currentArea));
-		int reactionDelay = this.getHumanReactionTime(HumanBehavior.ReactionContext.CLICKING_PORTAL);
-		Global.sleep(reactionDelay);
-		WorldPoint areaTile = randomAreaTile(this.currentArea);
-		if (areaTile != null) {
-			Rs2Walker.walkTo(areaTile);
-		}
-		this.sleepWithFatigue(3000, 4500);
-		this.lastSelectedLocationWalkFinishedAtMs = System.currentTimeMillis();
-		if (randomPrayers == 1 && this.quickprayersEnabled && !this.switchPrayersEnabled) {
-			this.status = "Turning on prayers";
-			this.log(this.status);
-			this.quickPrayer();
+			sendDiscordEmbed("Entering " + this.getAreaNameFor(this.currentArea));
+			int reactionDelay = this.getHumanReactionTime(HumanBehavior.ReactionContext.CLICKING_PORTAL);
+			Global.sleep(reactionDelay);
+			WorldPoint areaTile = randomAreaTile(this.currentArea);
+			if (areaTile != null) {
+				Rs2Walker.walkTo(areaTile);
+			}
+			this.sleepWithFatigue(3000, 4500);
+			this.lastSelectedLocationWalkFinishedAtMs = System.currentTimeMillis();
+			if (randomPrayers == 1 && this.quickprayersEnabled && !this.switchPrayersEnabled) {
+				this.status = "Turning on prayers";
+				this.log(this.status);
+				this.quickPrayer();
+			}
+		} catch (Throwable t) {
+			if (t instanceof InterruptedException || (t.getCause() instanceof InterruptedException)) {
+				Thread.currentThread().interrupt();
+				throw t;
+			}
+			log.debug("clickPortal error", t);
 		}
 	}
 
@@ -2455,35 +2480,9 @@ public class ViruzFFABotScript extends Script
 		this.nextActionTime = System.currentTimeMillis() + delay;
 	}
 
-	private void randomCameraRotation() {
-		this.status = "Rotating camera";
-		this.log(this.status);
 
-		for (int i = 0; i < 1; ++i) {
-			rotateCameraTo(
-					getCameraYawDegrees() + Rs2Random.between(-15, 15),
-					Rs2Camera.getPitch() + Rs2Random.between(-10, 10)
-			);
-			this.sleepWithFatigue(200, 950);
-		}
 
-	}
 
-	private void checkRandomSkill() {
-		this.status = "Checking combat skills";
-		this.log(this.status);
-		if (Rs2Tab.switchTo(InterfaceTab.SKILLS)) {
-			Skill[] combatSkills = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.RANGED, Skill.MAGIC, Skill.HITPOINTS};
-			Skill randomSkill = combatSkills[Rs2Random.between(0, combatSkills.length - 1)];
-			int hoverX = 690 + Rs2Random.between(-8, 8);
-			int hoverY = 208 + ArrayIndexSkillOffset(randomSkill) * 32 + Rs2Random.between(-6, 6);
-			naturalMouseMovement(hoverX, hoverY);
-			this.sleepWithFatigue(600, 1800);
-			if (Rs2Random.between(0, 100) < 40) {
-				Rs2Tab.switchTo(InterfaceTab.INVENTORY);
-			}
-		}
-	}
 
 	private int ArrayIndexSkillOffset(Skill skill) {
 		switch (skill) {
@@ -2496,122 +2495,63 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void hoverRandomPlayer() {
-		this.status = "Hovering random player";
-		this.log(this.status);
-		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
-		if (local == null) return;
-		String localName = local.getName() == null ? "" : local.getName();
-		List<Rs2PlayerModel> players = getPlayers(p -> p != null && p.getName() != null
-				&& !p.getName().equalsIgnoreCase(localName)
-				&& p.getWorldLocation() != null
-				&& distanceBetween(local, p) < 10)
-				.collect(Collectors.toList());
-		if (!players.isEmpty()) {
-			Rs2PlayerModel target = players.get(Rs2Random.between(0, players.size() - 1));
-			if (target != null) {
-				Point p = getClickablePoint(target);
-				if (p != null) {
-					naturalMouseMovement(p.x, p.y);
-					this.sleepWithFatigue(400, 1200);
-				}
-			}
-		}
-	}
 
-	private void examineRandomObject() {
-		this.status = "Examining random object";
-		this.log(this.status);
-		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
-		WorldPoint localTile = local == null ? null : local.getWorldLocation();
-		if (localTile == null) return;
-		Rs2TileObjectModel obj = Microbot.getRs2TileObjectCache().query()
-				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
-				.where(o -> Math.hypot(o.getWorldLocation().getX() - localTile.getX(),
-						o.getWorldLocation().getY() - localTile.getY()) < 5)
-				.first();
-		if (obj != null) {
-			obj.click("Examine");
-			this.sleepWithFatigue(300, 1000);
-		}
-	}
+
+
 
 	private void performAntiban() {
 		try {
-		this.onAction();
-		if (this.simulateHumanError()) {
-			this.status = "Mistake...";
-			Microbot.naturalMouse.moveOffScreen();
-			Global.sleep(1000 + ThreadLocalRandom.current().nextInt(3000));
-			return;
-		}
-		int fatigueVariance = this.getCurrentFatigueLevel();
-		if (fatigueVariance > 100 && Rs2Random.between(0, 100) < 15) {
-			this.sleepWithFatigue(500, 2000);
-			return;
-		}
-
-		long runtime = System.currentTimeMillis() - fatigueStart;
-		double fatigueF = this.getFatigueFactor(runtime);
-		double contextualChance = fatigueF > 8.0 ? 0.50 : fatigueF > 4.0 ? 0.35 : 0.25;
-		if (ThreadLocalRandom.current().nextDouble() < contextualChance) {
-			HumanBehavior.AntiBanSuggestion suggestion = getContextualAntiBanAction(fatigueF);
-			if (suggestion != null) {
-				executeAntiBanSuggestion(suggestion.action);
+			this.onAction();
+			if (this.simulateHumanError()) {
+				this.status = "Mistake...";
+				Microbot.naturalMouse.moveOffScreen();
+				Global.sleep(1000 + ThreadLocalRandom.current().nextInt(3000));
 				return;
 			}
-		}
-		int roll = Rs2Random.between(1, 500);
-		if (roll <= 180) {
-			this.sleepWithFatigue(2000, 8000);
-		} else if (roll <= 230) {
-			this.idleGaze();
-		} else if (roll <= 265) {
-			this.pseudoAfk();
-		} else if (roll <= 290) {
-			this.stretchMicrobreak();
-		} else if (roll <= 315) {
-			this.randomCameraRotation();
-		} else if (roll <= 335) {
-			int sub = Rs2Random.between(0, 2);
-			if (sub == 0) {
-				this.checkRandomSkill();
-			} else if (sub == 1) {
-				this.inventoryHover();
-			} else {
-				this.checkEquipmentTab();
+			int fatigueVariance = this.getCurrentFatigueLevel();
+			if (fatigueVariance > 100 && Rs2Random.between(0, 100) < 15) {
+				this.sleepWithFatigue(500, 2000);
+				return;
 			}
-		} else if (roll <= 350) {
-			this.mousePatternMove();
-		} else if (roll <= 365) {
-			this.walkAdjust();
-		} else if (roll <= 378) {
-			this.hoverSelf();
-		} else if (roll <= 390) {
-			this.rightClickMenuHover();
-		} else if (roll <= 400) {
-			this.doubleTabCycle();
-		} else if (roll <= 410) {
-			this.examineGroundDecoration();
-		} else if (roll <= 420) {
-			this.hoverRandomPlayer();
-		} else if (roll <= 428) {
-			this.chatboxClick();
-		} else if (roll <= 435) {
-			this.friendsChatHover();
-		} else if (roll <= 442) {
-			this.mouseScrollWheel();
-		} else if (roll <= 449) {
-			this.runTrackerScans();
-		} else if (roll <= 455) {
-			Microbot.naturalMouse.moveOffScreen();
-			this.sleepWithFatigue(2000, 5000);
-		} else {
-			this.sleepWithFatigue(3000, 10000);
-		}
-		if (Rs2Random.between(0, 6) == 0) {
-			sendDiscordEmbed("Running Anti-Ban routine");
-		}
+
+			long runtime = System.currentTimeMillis() - fatigueStart;
+			double fatigueF = this.getFatigueFactor(runtime);
+			double contextualChance = fatigueF > 8.0 ? 0.50 : fatigueF > 4.0 ? 0.35 : 0.25;
+			if (ThreadLocalRandom.current().nextDouble() < contextualChance) {
+				HumanBehavior.AntiBanSuggestion suggestion = getContextualAntiBanAction(fatigueF);
+				if (suggestion != null) {
+					executeAntiBanSuggestion(suggestion.action);
+					return;
+				}
+			}
+			int roll = Rs2Random.between(1, 500);
+			if (roll <= 180) {
+				this.sleepWithFatigue(2000, 8000);
+			} else if (roll <= 265) {
+				this.pseudoAfk();
+			} else if (roll <= 290) {
+				this.stretchMicrobreak();
+			} else if (roll <= 335) {
+				if (Rs2Random.between(0, 100) < 50) {
+					this.checkEquipmentTab();
+				} else {
+					this.sleepWithFatigue(2000, 8000);
+				}
+			} else if (roll <= 365) {
+				this.walkAdjust();
+			} else if (roll <= 400) {
+				this.doubleTabCycle();
+			} else if (roll <= 449) {
+				this.runTrackerScans();
+			} else if (roll <= 455) {
+				Microbot.naturalMouse.moveOffScreen();
+				this.sleepWithFatigue(2000, 5000);
+			} else {
+				this.sleepWithFatigue(3000, 10000);
+			}
+			if (Rs2Random.between(0, 6) == 0) {
+				sendDiscordEmbed("Running Anti-Ban routine");
+			}
 		} catch (RuntimeException ex) {
 			this.log("Antiban interrupted: " + ex.getMessage());
 		}
@@ -2622,26 +2562,10 @@ public class ViruzFFABotScript extends Script
 		long runtime = now - fatigueStart;
 		double fatigueF = this.getFatigueFactor(runtime);
 		switch (action) {
-			case "idle_gaze":
-				this.idleGaze();
-				break;
 			case "camera_turn":
-				this.randomCameraRotation();
 				break;
 			case "tab_cycle":
 				this.doubleTabCycle();
-				break;
-			case "mouse_move":
-				this.mousePatternMove();
-				break;
-			case "skill_check":
-				this.checkRandomSkill();
-				break;
-			case "inventory_hover":
-				this.inventoryHover();
-				break;
-			case "hover_player":
-				this.hoverRandomPlayer();
 				break;
 			case "microbreak":
 				this.stretchMicrobreak();
@@ -2654,9 +2578,6 @@ public class ViruzFFABotScript extends Script
 				break;
 			case "equipment_check":
 				this.checkEquipmentTab();
-				break;
-			case "examine_object":
-				this.examineRandomObject();
 				break;
 			case "right_click_drag":
 				this.rightClickDrag();
@@ -2769,14 +2690,7 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void idleGaze() {
-		this.status = "Staring into space";
-		this.log(this.status);
-		int gazeX = Rs2Random.between(200, 550);
-		int gazeY = Rs2Random.between(150, 350);
-		naturalMouseMovement(gazeX, gazeY);
-		this.sleepWithFatigue(1500, 5000);
-	}
+
 
 	private void postCombatGlance() {
 		this.status = "Quick equipment check";
@@ -3008,7 +2922,7 @@ public class ViruzFFABotScript extends Script
 		Microbot.naturalMouse.moveOffScreen();
 		this.sleepWithFatigue(4000, 10000);
 		if (Rs2Random.between(0, 100) < 20) {
-			this.randomCameraRotation();
+
 		}
 	}
 
@@ -3056,37 +2970,9 @@ public class ViruzFFABotScript extends Script
 		this.sleepWithFatigue(100, 300);
 	}
 
-	private void mouseScrollWheel() {
-		this.status = "Scrolling";
-		int scrolls = Rs2Random.between(1, 5);
-		int sX = Rs2Random.between(520, 740);
-		int sY = Rs2Random.between(5, 100);
-		naturalMouseMovement(sX, sY);
-		Global.sleep(Rs2Random.between(150, 400));
-		for (int i = 0; i < scrolls; i++) {
-			int scrollX = sX + Rs2Random.between(-2, 2);
-			int scrollY = sY + i * 8 + Rs2Random.between(-2, 2);
-			Microbot.getMouse().move(new net.runelite.api.Point(scrollX, scrollY));
-			Global.sleep(Rs2Random.between(100, 300));
-		}
-		Global.sleep(Rs2Random.between(200, 500));
-	}
 
-	private void rightClickMenuHover() {
-		this.status = "Hovering right-click menu";
-		int x = Rs2Random.between(200, 500);
-		int y = Rs2Random.between(150, 350);
-		int clickX = x + Rs2Random.between(-5, 5);
-		int clickY = y + Rs2Random.between(-5, 5);
-		naturalMouseMovement(clickX, clickY);
-		Microbot.getMouse().click(new net.runelite.api.Point(clickX, clickY), true);
-		Global.sleep(Rs2Random.between(100, 300));
-		int hoverX = x + Rs2Random.between(-30, 30);
-		int hoverY = y + Rs2Random.between(-80, -20);
-		naturalMouseMovement(hoverX, hoverY);
-		Global.sleep(Rs2Random.between(300, 800));
-		Microbot.getMouse().click(new net.runelite.api.Point(x + 50, y + 50), false);
-	}
+
+
 
 	private void openWorldMap() {
 		this.status = "Checking world map";
@@ -3105,18 +2991,7 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void chatboxClick() {
-		this.status = "Clicking chatbox";
-		int chatX = Rs2Random.between(20, 500);
-		int chatY = Rs2Random.between(440, 480);
-		naturalMouseMovement(chatX, chatY);
-		Global.sleep(Rs2Random.between(200, 600));
-		if (Rs2Random.between(0, 100) < 30) {
-			Microbot.getMouse().click(new net.runelite.api.Point(chatX, chatY), false);
-			Global.sleep(Rs2Random.between(100, 300));
-			Microbot.getMouse().click(new net.runelite.api.Point(chatX + 50, chatY), false);
-		}
-	}
+
 
 	private void walkAdjust() {
 		this.status = "Adjusting position";
@@ -3136,39 +3011,9 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void hoverSelf() {
-		this.status = "Hovering over self";
-		Rs2PlayerModel local = Rs2Player.getLocalPlayer();
-		if (local == null) return;
-		Point p = getClickablePoint(local);
-		if (p != null) {
-			naturalMouseMovement(p.x, p.y);
-		}
-		Global.sleep(Rs2Random.between(300, 900));
-	}
 
-	private void examineGroundDecoration() {
-		this.status = "Examining ground";
-		Rs2TileObjectModel deco = Microbot.getRs2TileObjectCache().query()
-				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
-				.where(o -> {
-					String n = tileObjectName(o);
-					return n != null && !n.toLowerCase(Locale.ROOT).contains("wall");
-				})
-				.within(6)
-				.firstOnClientThread();
-		if (deco == null) return;
-		if (tileObjectHasAction(deco, "Examine")) {
-			deco.click("Examine");
-			Global.sleep(Rs2Random.between(400, 1100));
-		} else {
-			Point p = getClickablePointForObject(deco);
-			if (p != null) {
-				naturalMouseMovement(p.x, p.y);
-			}
-			Global.sleep(Rs2Random.between(300, 800));
-		}
-	}
+
+
 
 	private void checkSpellbook() {
 		this.status = "Checking spellbook";
@@ -3182,33 +3027,9 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void mousePatternMove() {
-		this.status = "Moving mouse in pattern";
-		Point start = Microbot.getMouse().getMousePosition();
-		if (start == null) return;
-		for (int i = 0; i < Rs2Random.between(2, 5); i++) {
-			int dx = Rs2Random.between(-80, 80);
-			int dy = Rs2Random.between(-60, 60);
-			int targetX = Math.max(0, Math.min(765, start.x + dx));
-			int targetY = Math.max(0, Math.min(503, start.y + dy));
-			naturalMouseMovement(targetX, targetY);
-			Global.sleep(Rs2Random.between(100, 350));
-			start = Microbot.getMouse().getMousePosition();
-			if (start == null) return;
-		}
-	}
 
-	private void friendsChatHover() {
-		this.status = "Checking friends chat";
-		if (Rs2Tab.switchTo(InterfaceTab.CHAT)) {
-			Global.sleep(Rs2Random.between(500, 1200));
-			int fX = Rs2Random.between(100, 500);
-			int fY = Rs2Random.between(100, 300);
-			naturalMouseMovement(fX, fY);
-			Global.sleep(Rs2Random.between(400, 1000));
-			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
-		}
-	}
+
+
 
 	private void climbdownStairs() {
 		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
@@ -3590,21 +3411,7 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private void inventoryHover() {
-		if (!Rs2Tab.isCurrentTab(InterfaceTab.INVENTORY)) {
-			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
-		}
-		this.sleepWithFatigue(200, 500);
-		Rs2ItemModel item = Rs2Inventory.items().filter(i -> i != null && i.getName() != null).findFirst().orElse(null);
-		if (item != null) {
-			Point p = getInventoryItemClickPoint(item);
-			if (p != null) {
-				naturalMouseMovement(p.x, p.y);
-			}
-			this.sleepWithFatigue(200, 700);
-			this.status = "Browsing inventory";
-		}
-	}
+
 
 	private void emoteTabHover() {
 		if (!Rs2Tab.switchTo(InterfaceTab.EMOTES)) return;
@@ -3635,7 +3442,7 @@ public class ViruzFFABotScript extends Script
 			int sleepTime = Rs2Random.between(5000, 15000);
 			this.sleepWithFatigue(sleepTime, sleepTime + 2000);
 			if (Rs2Random.between(0, 100) < 3 + (int) (fatigueFactor * 0.2)) {
-				this.randomCameraRotation();
+
 			}
 			this.status = "Forced break: " + ((breakEnd - System.currentTimeMillis()) / 1000L) + "s left";
 		}
