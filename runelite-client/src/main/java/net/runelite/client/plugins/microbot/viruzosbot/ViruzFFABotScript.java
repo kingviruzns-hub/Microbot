@@ -75,7 +75,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.3";
+	static final String VERSION = "1.0.4";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -96,6 +96,7 @@ public class ViruzFFABotScript extends Script
 		this.chatGrabberEnabled.set(config.chatGrabber());
 		this.lureMultiEnabled = config.lureMulti();
 		this.noDragEnabled = config.noDrag();
+		this.dragModeEnabled = config.dragMode();
 		if (this.lureMultiEnabled) {
 			this.noDragEnabled = false;
 		}
@@ -146,6 +147,19 @@ public class ViruzFFABotScript extends Script
 	private final WorldArea SECOND_TOWER1 = new WorldArea(3364, 4812, 3, 6, 0);
 	private final WorldArea SECOND_TOWER2 = new WorldArea(3366, 4812, 4, 3, 0);
 	private final WorldArea SECOND_TOWER3 = new WorldArea(3369, 4806, 5, 9, 0);
+	private static final WorldPoint DRAG_EAST = new WorldPoint(3376, 4762, 0);
+	private static final WorldPoint DRAG_WEST = new WorldPoint(3277, 4762, 0);
+	private static final int DRAG_SAFE_ZONE_Y = 4758;
+	private static final int DRAG_ARRIVE_DISTANCE = 1;
+	private static final int DRAG_CLOSE_DISTANCE = 3;
+	private static final int DRAG_FOLLOW_DISTANCE = 8;
+	private static final long DRAG_RETALIATE_TIMEOUT_MS = 4000L;
+	private static final long DRAG_CLOSE_TIMEOUT_MS = 8000L;
+	private static final long DRAG_WALK_TIMEOUT_MS = 20_000L;
+	private static final int DRAG_STEP_SLEEP_MIN_MS = 150;
+	private static final int DRAG_STEP_SLEEP_MAX_MS = 350;
+	private static final int DRAG_MAX_STEPS = 300;
+	private static final int DRAG_MAX_REENGAGE_ATTEMPTS = 5;
 	@Getter
 	@Setter
 	private boolean attackEnabled = true;
@@ -220,6 +234,9 @@ public class ViruzFFABotScript extends Script
 	private boolean hillScanActive = false;
 	boolean hillScanEnabled = false;
 	boolean noDragEnabled = false;
+	@Getter
+	@Setter
+	private boolean dragModeEnabled = false;
 	@Setter
     private ViruzFFABotConfig config;
 	private final Set<String> focusPlayerNames = new HashSet<>();
@@ -1531,6 +1548,10 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 			final String targetName = (target.getName() == null) ? "" : target.getName().toLowerCase(Locale.ROOT).trim();
+			if (this.isPortalDragEligible(target)) {
+				this.dragPortalTarget(target, localPlayer);
+				return;
+			}
 			if (!localInSafeZone && isLureBot(target.getName()) && !noDragEnabled) {
 				lureDragToSafe(target, localPlayer);
 				return;
@@ -1909,6 +1930,237 @@ public class ViruzFFABotScript extends Script
 			Rs2Walker.walkTo(hillsTile, 1);
 			Global.sleep(Rs2Random.between(400, 800));
 		}
+	}
+
+	private boolean isPortalDragEligible(Rs2PlayerModel target) {
+		if (!this.dragModeEnabled || target == null) return false;
+		WorldArea portal = this.areaMap.get("Portal");
+		if (portal == null || this.currentArea == null || !this.currentArea.equals(portal)) return false;
+		WorldPoint targetTile = target.getWorldLocation();
+		return targetTile != null && portal.contains(targetTile);
+	}
+
+	/**
+	 * Drag-Mode: attacks a Portal target, waits until it retaliates, then walks it to the east or
+	 * west drag tile. At the drag tile it waits for the target to catch up; if the target stopped
+	 * following it re-attacks and keeps dragging. Once the target is following again the script runs
+	 * through the safe zone (y = 4758) and back into Portal.
+	 */
+	private void dragPortalTarget(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
+		if (localPlayer == null || !playerExists(target)) return;
+		WorldPoint localTile = localPlayer.getWorldLocation();
+		WorldArea portal = this.areaMap.get("Portal");
+		if (localTile == null || portal == null || !portal.contains(localTile)) return;
+
+		final String targetName = target.getName();
+		if (targetName == null) return;
+		final String targetKey = targetName.toLowerCase(Locale.ROOT).trim();
+		if (targetKey.isEmpty() || !this.attackSet.contains(targetKey)) return;
+
+		final boolean dragEast = ThreadLocalRandom.current().nextBoolean();
+		final WorldPoint dragPoint = dragEast ? DRAG_EAST : DRAG_WEST;
+		final String direction = dragEast ? "east" : "west";
+
+		this.status = "Drag-Mode: engaging " + targetName;
+		this.log("Drag-Mode: dragging " + targetName + " " + direction);
+		sendDiscordEmbed("Drag-Mode: dragging " + targetName + " " + direction);
+
+		if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
+			this.status = "Drag-Mode: " + targetName + " did not retaliate";
+			Rs2Walker.setTarget(null, "viruz: drag-mode disengage");
+			return;
+		}
+		this.sessionTracker.recordAttack();
+		this.playerStats.recordAttack(targetName);
+		this.status = "Drag-Mode: dragging " + targetName + " " + direction;
+
+		boolean reached = this.dragTargetToPoint(target, targetKey, localPlayer, dragPoint);
+		if (!reached) {
+			this.status = "Drag-Mode: drag interrupted";
+			Rs2Walker.setTarget(null, "viruz: drag-mode interrupted");
+			return;
+		}
+
+		boolean close = this.waitForTargetClose(target, localPlayer, DRAG_CLOSE_TIMEOUT_MS);
+		int reengages = 0;
+		while (!close && reengages++ < DRAG_MAX_REENGAGE_ATTEMPTS && playerExists(target)) {
+			this.status = "Drag-Mode: target not following, re-attacking " + targetName;
+			if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
+				break;
+			}
+			this.dragTargetToPoint(target, targetKey, localPlayer, dragPoint);
+			close = this.waitForTargetClose(target, localPlayer, DRAG_CLOSE_TIMEOUT_MS);
+		}
+
+		if (!close) {
+			this.status = "Drag-Mode: " + targetName + " stopped following";
+			this.log(this.status);
+			Rs2Walker.setTarget(null, "viruz: drag-mode target lost");
+			return;
+		}
+
+		this.runSafeZoneAndReturnToPortal(localPlayer);
+	}
+
+	private boolean dragTargetToPoint(Rs2PlayerModel target,
+									  String targetKey,
+									  Rs2PlayerModel localPlayer,
+									  WorldPoint dragPoint) {
+		int reengageFailures = 0;
+		long lastReengageAtMs = 0L;
+		for (int step = 0; step < DRAG_MAX_STEPS; step++) {
+			if (!playerExists(target) || !playerExists(localPlayer)) return false;
+			WorldPoint localTile = localPlayer.getWorldLocation();
+			WorldPoint targetTile = target.getWorldLocation();
+			if (localTile == null) return false;
+			if (localTile.distanceTo(dragPoint) <= DRAG_ARRIVE_DISTANCE) return true;
+			if (targetTile != null && targetTile.distanceTo(dragPoint) <= DRAG_ARRIVE_DISTANCE) return true;
+
+			if (!this.isTargetFollowing(target, localPlayer)) {
+				long now = System.currentTimeMillis();
+				boolean targetInRange = targetTile != null
+						&& localTile.distanceTo(targetTile) <= MAX_TARGET_DISTANCE;
+				if (targetInRange && now - lastReengageAtMs >= 2000L) {
+					lastReengageAtMs = now;
+					this.status = "Drag-Mode: re-attacking " + target.getName();
+					if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)
+							&& ++reengageFailures >= DRAG_MAX_REENGAGE_ATTEMPTS) {
+						return false;
+					}
+					if (!playerExists(target)) return false;
+				}
+			}
+
+			WalkerState state = Rs2Walker.walkStep(dragPoint, DRAG_ARRIVE_DISTANCE);
+			if (state == WalkerState.ARRIVED) return true;
+			if (state == WalkerState.UNREACHABLE || state == WalkerState.EXIT) return false;
+			this.sleepWithFatigue(DRAG_STEP_SLEEP_MIN_MS, DRAG_STEP_SLEEP_MAX_MS);
+		}
+		return false;
+	}
+
+	private boolean attackAndWaitForRetaliation(Rs2PlayerModel target,
+												String targetKey,
+												Rs2PlayerModel localPlayer) {
+		if (target == null || localPlayer == null || targetKey == null || targetKey.isEmpty()) return false;
+		if (!playerExists(target)) return false;
+		if (this.isTargetRetaliating(target, localPlayer)) return true;
+
+		if (this.notInteractingWith(targetKey)) {
+			if (!this.isPlayerOnScreen(target) && !this.rotateCameraToFace(target)) {
+				return false;
+			}
+			if (!this.rightClickInteract(target)) {
+				return false;
+			}
+			Global.sleepUntil(() -> !this.notInteractingWith(targetKey), 1500);
+		}
+
+		boolean retaliated = Global.sleepUntil(
+				() -> this.isTargetRetaliating(target, localPlayer),
+				(int) DRAG_RETALIATE_TIMEOUT_MS);
+		if (retaliated) {
+			this.lastAttackAttemptAtMs = System.currentTimeMillis();
+			this.lastSameTargetAttemptAtMs = this.lastAttackAttemptAtMs;
+			this.lastCombatActivityMs = this.lastAttackAttemptAtMs;
+			this.lastAttackTargetName = targetKey;
+		}
+		return retaliated;
+	}
+
+	private boolean isTargetRetaliating(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
+		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		Actor interacting = target.getInteracting();
+		if (!(interacting instanceof Player)) return false;
+		String localName = normalizeActorName(localPlayer.getName());
+		String interactingName = normalizeActorName(interacting.getName());
+		return !localName.isEmpty() && localName.equals(interactingName);
+	}
+
+	private boolean isTargetFollowing(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
+		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		if (this.isTargetRetaliating(target, localPlayer)) return true;
+		WorldPoint localTile = localPlayer.getWorldLocation();
+		WorldPoint targetTile = target.getWorldLocation();
+		if (localTile == null || targetTile == null) return false;
+		return localTile.distanceTo(targetTile) <= DRAG_FOLLOW_DISTANCE;
+	}
+
+	private boolean waitForTargetClose(Rs2PlayerModel target, Rs2PlayerModel localPlayer, long timeoutMs) {
+		long deadline = System.currentTimeMillis() + timeoutMs;
+		while (System.currentTimeMillis() < deadline) {
+			if (target == null || localPlayer == null || !playerExists(target) || !playerExists(localPlayer)) {
+				return false;
+			}
+			if (this.isTargetCloseOrRetaliating(target, localPlayer)) return true;
+			this.sleepWithFatigue(250, 500);
+		}
+		return false;
+	}
+
+	private boolean isTargetCloseOrRetaliating(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
+		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		WorldPoint localTile = localPlayer.getWorldLocation();
+		WorldPoint targetTile = target.getWorldLocation();
+		if (localTile == null || targetTile == null) return false;
+		int distance = localTile.distanceTo(targetTile);
+		return distance <= DRAG_CLOSE_DISTANCE
+				|| (distance <= DRAG_FOLLOW_DISTANCE && this.isTargetRetaliating(target, localPlayer));
+	}
+
+	private void runSafeZoneAndReturnToPortal(Rs2PlayerModel localPlayer) {
+		WorldPoint localTile = localPlayer == null ? null : localPlayer.getWorldLocation();
+		if (localTile == null) return;
+
+		final int safeMinX = this.SAFE_ZONE.getX();
+		final int safeMaxX = safeMinX + this.SAFE_ZONE.getWidth() - 1;
+		final int safeX = Math.max(safeMinX, Math.min(localTile.getX(), safeMaxX));
+		final WorldPoint safePoint = new WorldPoint(safeX, DRAG_SAFE_ZONE_Y, 0);
+
+		this.status = "Drag-Mode: running to safe zone";
+		this.log(this.status);
+		if (!this.walkDragPoint(safePoint, DRAG_ARRIVE_DISTANCE, DRAG_WALK_TIMEOUT_MS)) {
+			this.status = "Drag-Mode: could not reach safe zone";
+			this.log(this.status);
+			return;
+		}
+
+		final WorldArea portal = this.areaMap.get("Portal");
+		final WorldPoint portalPoint = portal == null ? null : this.randomAreaTile(portal);
+		if (portalPoint == null) return;
+
+		this.status = "Drag-Mode: returning to Portal through safe zone";
+		this.log(this.status);
+		if (this.walkDragPoint(portalPoint, DRAG_ARRIVE_DISTANCE, DRAG_WALK_TIMEOUT_MS)) {
+			this.status = "Drag-Mode: back at Portal";
+			this.lastSelectedLocationWalkFinishedAtMs = System.currentTimeMillis();
+		} else {
+			this.status = "Drag-Mode: returning to Portal";
+			this.log(this.status);
+		}
+	}
+
+	private boolean walkDragPoint(WorldPoint point, int distance, long timeoutMs) {
+		if (point == null) return false;
+		long deadline = System.currentTimeMillis() + timeoutMs;
+		while (System.currentTimeMillis() < deadline) {
+			WalkerState state = Rs2Walker.walkStep(point, distance);
+			if (state == WalkerState.ARRIVED) {
+				Rs2Walker.setTarget(null, "viruz: drag-mode walk complete");
+				return true;
+			}
+			if (state == WalkerState.UNREACHABLE || state == WalkerState.EXIT) {
+				Rs2Walker.setTarget(null, "viruz: drag-mode walk aborted");
+				return false;
+			}
+			this.sleepWithFatigue(DRAG_STEP_SLEEP_MIN_MS, DRAG_STEP_SLEEP_MAX_MS);
+		}
+		Rs2Walker.setTarget(null, "viruz: drag-mode walk timed out");
+		return false;
+	}
+
+	private static String normalizeActorName(String name) {
+		return name == null ? "" : name.replace('\u00A0', ' ').trim().toLowerCase(Locale.ROOT);
 	}
 
 	private boolean isTargetValid(Rs2PlayerModel player,

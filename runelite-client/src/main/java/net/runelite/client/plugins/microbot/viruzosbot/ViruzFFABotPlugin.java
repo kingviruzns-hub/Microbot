@@ -68,6 +68,8 @@ public class ViruzFFABotPlugin extends Plugin {
 			script.resetFatigue();
 		} else if ("reloadNsList".equals(key)) {
 			script.reloadNsList();
+		} else if ("dragMode".equals(key)) {
+			script.setDragModeEnabled(Boolean.parseBoolean(event.getNewValue()));
 		}
 	}
 }

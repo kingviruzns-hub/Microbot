@@ -69,6 +69,9 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 11, section = toggles)
     default boolean noDrag() { return false; }
 
+    @ConfigItem(keyName = "dragMode", name = "Drag-Mode", description = "Attack targets in Portal, wait for retaliation, then drag them east or west out of the Portal area", position = 12, section = toggles)
+    default boolean dragMode() { return false; }
+
     @ConfigSection(name = "Location", description = "Combat area selection", position = 1)
     String locationSection = "locationSection";
 
