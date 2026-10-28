@@ -178,7 +178,7 @@ public class ViruzFFABotScript extends Script
 	private final AtomicBoolean sessionInitialized = new AtomicBoolean(false);
 	private volatile boolean sessionAnnounced = false;
 	String selectedLocation = "None selected";
-	private int currentThreshold = getRandomThreshold();
+	private final int currentThreshold = getRandomThreshold();
 	private WorldArea currentArea = null;
 	private long lastSelectedLocationWalkFinishedAtMs = 0L;
 	Timer timer2;
@@ -672,7 +672,7 @@ public class ViruzFFABotScript extends Script
 				}
 				onLoop();
 			} catch (Throwable ex) {
-				if (ex instanceof InterruptedException || (ex.getCause() instanceof InterruptedException)) {
+				if (ex.getCause() instanceof InterruptedException) {
 					Thread.currentThread().interrupt();
 					log.info("Script interrupted, shutting down");
 					if (mainScheduledFuture != null) {
@@ -739,7 +739,7 @@ public class ViruzFFABotScript extends Script
 					this.climbdownStairs();
 					this.clickPortal();
 				} catch (Throwable t) {
-					if (t instanceof InterruptedException || (t.getCause() instanceof InterruptedException)) {
+					if (t.getCause() instanceof InterruptedException) {
 						Thread.currentThread().interrupt();
 						return;
 					}
@@ -2322,7 +2322,7 @@ public class ViruzFFABotScript extends Script
 				this.quickPrayer();
 			}
 		} catch (Throwable t) {
-			if (t instanceof InterruptedException || (t.getCause() instanceof InterruptedException)) {
+			if (t.getCause() instanceof InterruptedException) {
 				Thread.currentThread().interrupt();
 				throw t;
 			}
@@ -2921,10 +2921,8 @@ public class ViruzFFABotScript extends Script
 		this.log(this.status);
 		Microbot.naturalMouse.moveOffScreen();
 		this.sleepWithFatigue(4000, 10000);
-		if (Rs2Random.between(0, 100) < 20) {
-
-		}
-	}
+        Rs2Random.between(0, 100);
+    }
 
 	private void doubleTabCycle() {
 		this.status = "Flicking through tabs";
@@ -3441,10 +3439,8 @@ public class ViruzFFABotScript extends Script
 		while (System.currentTimeMillis() < breakEnd) {
 			int sleepTime = Rs2Random.between(5000, 15000);
 			this.sleepWithFatigue(sleepTime, sleepTime + 2000);
-			if (Rs2Random.between(0, 100) < 3 + (int) (fatigueFactor * 0.2)) {
-
-			}
-			this.status = "Forced break: " + ((breakEnd - System.currentTimeMillis()) / 1000L) + "s left";
+            Rs2Random.between(0, 100);
+            this.status = "Forced break: " + ((breakEnd - System.currentTimeMillis()) / 1000L) + "s left";
 		}
 		double recoveryFactor = 0.6 + (fatigueFactor / 20.0) * 0.2;
 		this.fatigueStart += (long) (breakDuration * recoveryFactor);
