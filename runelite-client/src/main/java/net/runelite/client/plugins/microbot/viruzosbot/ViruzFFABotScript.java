@@ -1935,7 +1935,7 @@ public class ViruzFFABotScript extends Script
 	private boolean isPortalDragEligible(Rs2PlayerModel target) {
 		if (!this.dragModeEnabled || target == null) return false;
 		WorldArea portal = this.areaMap.get("Portal");
-		if (portal == null || this.currentArea == null || !this.currentArea.equals(portal)) return false;
+		if (this.currentArea == null || !this.currentArea.equals(portal)) return false;
 		WorldPoint targetTile = target.getWorldLocation();
 		return targetTile != null && portal.contains(targetTile);
 	}
@@ -1965,7 +1965,7 @@ public class ViruzFFABotScript extends Script
 		this.log("Drag-Mode: dragging " + targetName + " " + direction);
 		sendDiscordEmbed("Drag-Mode: dragging " + targetName + " " + direction);
 
-		if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
+		if (this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
 			this.status = "Drag-Mode: " + targetName + " did not retaliate";
 			Rs2Walker.setTarget(null, "viruz: drag-mode disengage");
 			return;
@@ -1985,7 +1985,7 @@ public class ViruzFFABotScript extends Script
 		int reengages = 0;
 		while (!close && reengages++ < DRAG_MAX_REENGAGE_ATTEMPTS && playerExists(target)) {
 			this.status = "Drag-Mode: target not following, re-attacking " + targetName;
-			if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
+			if (this.attackAndWaitForRetaliation(target, targetKey, localPlayer)) {
 				break;
 			}
 			this.dragTargetToPoint(target, targetKey, localPlayer, dragPoint);
@@ -2023,7 +2023,7 @@ public class ViruzFFABotScript extends Script
 				if (targetInRange && now - lastReengageAtMs >= 2000L) {
 					lastReengageAtMs = now;
 					this.status = "Drag-Mode: re-attacking " + target.getName();
-					if (!this.attackAndWaitForRetaliation(target, targetKey, localPlayer)
+					if (this.attackAndWaitForRetaliation(target, targetKey, localPlayer)
 							&& ++reengageFailures >= DRAG_MAX_REENGAGE_ATTEMPTS) {
 						return false;
 					}
@@ -2042,16 +2042,16 @@ public class ViruzFFABotScript extends Script
 	private boolean attackAndWaitForRetaliation(Rs2PlayerModel target,
 												String targetKey,
 												Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || targetKey == null || targetKey.isEmpty()) return false;
-		if (!playerExists(target)) return false;
-		if (this.isTargetRetaliating(target, localPlayer)) return true;
+		if (target == null || localPlayer == null || targetKey == null || targetKey.isEmpty()) return true;
+		if (!playerExists(target)) return true;
+		if (this.isTargetRetaliating(target, localPlayer)) return false;
 
 		if (this.notInteractingWith(targetKey)) {
 			if (!this.isPlayerOnScreen(target) && !this.rotateCameraToFace(target)) {
-				return false;
+				return true;
 			}
 			if (!this.rightClickInteract(target)) {
-				return false;
+				return true;
 			}
 			Global.sleepUntil(() -> !this.notInteractingWith(targetKey), 1500);
 		}
@@ -2065,11 +2065,11 @@ public class ViruzFFABotScript extends Script
 			this.lastCombatActivityMs = this.lastAttackAttemptAtMs;
 			this.lastAttackTargetName = targetKey;
 		}
-		return retaliated;
+		return !retaliated;
 	}
 
 	private boolean isTargetRetaliating(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		if (localPlayer == null || !playerExists(target)) return false;
 		Actor interacting = target.getInteracting();
 		if (!(interacting instanceof Player)) return false;
 		String localName = normalizeActorName(localPlayer.getName());
@@ -2078,7 +2078,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean isTargetFollowing(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		if (localPlayer == null || !playerExists(target)) return false;
 		if (this.isTargetRetaliating(target, localPlayer)) return true;
 		WorldPoint localTile = localPlayer.getWorldLocation();
 		WorldPoint targetTile = target.getWorldLocation();
@@ -2089,7 +2089,7 @@ public class ViruzFFABotScript extends Script
 	private boolean waitForTargetClose(Rs2PlayerModel target, Rs2PlayerModel localPlayer, long timeoutMs) {
 		long deadline = System.currentTimeMillis() + timeoutMs;
 		while (System.currentTimeMillis() < deadline) {
-			if (target == null || localPlayer == null || !playerExists(target) || !playerExists(localPlayer)) {
+			if (!playerExists(target) || !playerExists(localPlayer)) {
 				return false;
 			}
 			if (this.isTargetCloseOrRetaliating(target, localPlayer)) return true;
@@ -2099,7 +2099,7 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private boolean isTargetCloseOrRetaliating(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
-		if (target == null || localPlayer == null || !playerExists(target)) return false;
+		if (localPlayer == null || !playerExists(target)) return false;
 		WorldPoint localTile = localPlayer.getWorldLocation();
 		WorldPoint targetTile = target.getWorldLocation();
 		if (localTile == null || targetTile == null) return false;
