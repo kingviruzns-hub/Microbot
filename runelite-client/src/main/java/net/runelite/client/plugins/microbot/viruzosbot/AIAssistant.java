@@ -105,8 +105,7 @@ public class AIAssistant {
         if (playerName == null || playerName.isEmpty()) return;
         String key = playerName.toLowerCase(Locale.ROOT).trim();
         PlayerProfile profile = playerProfiles.computeIfAbsent(key, k -> new PlayerProfile());
-        long now = System.currentTimeMillis();
-        profile.lastSeenAt = now;
+        profile.lastSeenAt = System.currentTimeMillis();
         if (combatLevel > 0) profile.combatLevel = combatLevel;
         if (gear != null) profile.gear = gear;
         modelDirty = true;
@@ -188,22 +187,20 @@ public class AIAssistant {
             modelDirty = true;
         }
         double score = DEFAULT_TARGET_SCORE;
-        if (profile != null) {
-            long timeSinceSeen = System.currentTimeMillis() - profile.lastSeenAt;
-            double decay = Math.exp(-timeSinceSeen / (double) THREAT_DECAY_MS);
-            double aggressiveness = (double) profile.timesFoughtBack / Math.max(1, profile.encounterCount);
-            double cowardice = (double) profile.timesRanToSafe / Math.max(1, profile.encounterCount);
-            score += (1.0 - aggressiveness) * 0.25;
-            score -= (cowardice > 0.6 ? 0.15 : 0);
-            score -= profile.threatScore * 0.2;
-            score += (profile.weWonRatio() > 0.6 ? 0.1 : 0);
-            score += decay * 0.1;
-            if (profile.timesAttackedUs >= 3 && profile.hitAndRunRatio() > 0.5) {
-                score -= 0.35;
-            }
-            if (profile.timesAttackedUs >= 5 && profile.combatLevel > 0 && profile.combatLevel < 60) {
-                score -= 0.2;
-            }
+        long timeSinceSeen = System.currentTimeMillis() - profile.lastSeenAt;
+        double decay = Math.exp(-timeSinceSeen / (double) THREAT_DECAY_MS);
+        double aggressiveness = (double) profile.timesFoughtBack / Math.max(1, profile.encounterCount);
+        double cowardice = (double) profile.timesRanToSafe / Math.max(1, profile.encounterCount);
+        score += (1.0 - aggressiveness) * 0.25;
+        score -= (cowardice > 0.6 ? 0.15 : 0);
+        score -= profile.threatScore * 0.2;
+        score += (profile.weWonRatio() > 0.6 ? 0.1 : 0);
+        score += decay * 0.1;
+        if (profile.timesAttackedUs >= 3 && profile.hitAndRunRatio() > 0.5) {
+            score -= 0.35;
+        }
+        if (profile.timesAttackedUs >= 5 && profile.combatLevel > 0 && profile.combatLevel < 60) {
+            score -= 0.2;
         }
         double distance = distanceBetween(localPlayer, candidate);
         score -= Math.max(0, (distance - 3) * 0.02);
@@ -280,9 +277,11 @@ public class AIAssistant {
     }
 
     public boolean shouldLeftClickInstead(boolean targetIsLowHp, double fatigueFactor) {
+        double safeFatigue = Math.max(0.0, fatigueFactor);
         double chance = 0.15;
         if (targetIsLowHp) chance += 0.15;
-        chance += fatigueFactor * 0.005;
+        chance += safeFatigue * 0.005;
+        chance = Math.max(0.0, Math.min(1.0, chance));
         return ThreadLocalRandom.current().nextDouble() < chance;
     }
 
@@ -350,7 +349,7 @@ public class AIAssistant {
         if (playerName == null || playerName.isEmpty()) return;
         String key = playerName.toLowerCase(Locale.ROOT).trim();
         PlayerProfile profile = playerProfiles.get(key);
-        if (profile == null || profile.status == null || !profile.status.startsWith("Quit")) return;
+        if (profile == null || profile.status == null || !profile.status.trim().toLowerCase(Locale.ROOT).startsWith("quit")) return;
         profile.status = null;
         modelDirty = true;
         saveModel();

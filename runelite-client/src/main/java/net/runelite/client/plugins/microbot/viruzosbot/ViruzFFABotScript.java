@@ -3374,7 +3374,7 @@ public class ViruzFFABotScript extends Script
 			String name = playerName.toLowerCase(Locale.ROOT).trim();
 			if (name.equals(localName)) continue;
 			nonTargetTracker.record(p, location);
-			aiAssistant.recordSeenPlayer(playerName, p.getCombatLevel());
+			aiAssistant.trackPlayer(playerName, p.getCombatLevel());
 		}
 	}
 
