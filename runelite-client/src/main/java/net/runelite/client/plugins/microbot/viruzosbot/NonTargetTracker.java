@@ -189,6 +189,22 @@ public class NonTargetTracker {
         }
     }
 
+    public void recordPlayer(String playerName, int combatLevel) {
+        record(playerName, 0, 0, 0, "Unknown", combatLevel);
+    }
+
+    public void trackPlayer(String playerName, int combatLevel) {
+        recordPlayer(playerName, combatLevel);
+    }
+
+    public void updateLastSeen(String playerName, int combatLevel) {
+        recordPlayer(playerName, combatLevel);
+    }
+
+    public void recordSeen(String playerName, int combatLevel) {
+        recordPlayer(playerName, combatLevel);
+    }
+
     public int getTrackedCount() {
         return entries.size();
     }

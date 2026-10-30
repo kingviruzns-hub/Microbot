@@ -38,7 +38,7 @@ public class AIAssistant {
     private final List<CombatEncounter> recentEncounters = new LinkedList<>();
     private final Map<String, AnimationPattern> animationPatterns = new ConcurrentHashMap<>();
     private long lastSaveTime = System.currentTimeMillis();
-    private static final long SAVE_INTERVAL_MS = 60_000L;
+    private static final long SAVE_INTERVAL_MS = 5_000L;
     private boolean modelDirty = false;
 
     public AIAssistant() {
@@ -77,9 +77,15 @@ public class AIAssistant {
         String key = attackerName.toLowerCase(Locale.ROOT);
         PlayerProfile profile = playerProfiles.computeIfAbsent(key, k -> new PlayerProfile());
         long now = System.currentTimeMillis();
-        if (now - profile.lastAttackOnUsAt < MIN_RECORD_INTERVAL_MS) return;
+        if (now - profile.lastAttackOnUsAt < MIN_RECORD_INTERVAL_MS) {
+            profile.lastSeenAt = now;
+            modelDirty = true;
+            conditionalSave();
+            return;
+        }
         profile.timesAttackedUs++;
         profile.lastAttackOnUsAt = now;
+        profile.lastSeenAt = now;
         if (theyRanAfterAttacking) {
             profile.timesHitAndRan++;
             profile.consecutiveHitAndRuns++;
@@ -89,6 +95,46 @@ public class AIAssistant {
         }
         modelDirty = true;
         conditionalSave();
+    }
+
+    public void recordSeenPlayer(String playerName, int combatLevel) {
+        recordSeenPlayer(playerName, combatLevel, null);
+    }
+
+    public void recordSeenPlayer(String playerName, int combatLevel, String[] gear) {
+        if (playerName == null || playerName.isEmpty()) return;
+        String key = playerName.toLowerCase(Locale.ROOT).trim();
+        PlayerProfile profile = playerProfiles.computeIfAbsent(key, k -> new PlayerProfile());
+        long now = System.currentTimeMillis();
+        profile.lastSeenAt = now;
+        if (combatLevel > 0) profile.combatLevel = combatLevel;
+        if (gear != null) profile.gear = gear;
+        modelDirty = true;
+        conditionalSave();
+    }
+
+    public void trackPlayer(String playerName, int combatLevel) {
+        recordSeenPlayer(playerName, combatLevel);
+    }
+
+    public void trackPlayer(String playerName, int combatLevel, String[] gear) {
+        recordSeenPlayer(playerName, combatLevel, gear);
+    }
+
+    public void updateLastSeen(String playerName) {
+        recordSeenPlayer(playerName, -1);
+    }
+
+    public void updateLastSeen(String playerName, int combatLevel) {
+        recordSeenPlayer(playerName, combatLevel);
+    }
+
+    public void recordPlayerSeen(String playerName, int combatLevel) {
+        recordSeenPlayer(playerName, combatLevel);
+    }
+
+    public void observePlayer(String playerName, int combatLevel) {
+        recordSeenPlayer(playerName, combatLevel);
     }
 
     public boolean isLikelyLureBot(String playerName) {
@@ -130,6 +176,17 @@ public class AIAssistant {
         boolean inList = attackSet.contains(key);
         if (!inList) return -0.5;
         PlayerProfile profile = playerProfiles.get(key);
+        if (profile == null) {
+            profile = playerProfiles.computeIfAbsent(key, k -> new PlayerProfile());
+            profile.combatLevel = getCombatLevel(candidate);
+            profile.lastSeenAt = System.currentTimeMillis();
+            modelDirty = true;
+        } else {
+            profile.lastSeenAt = System.currentTimeMillis();
+            int cb = getCombatLevel(candidate);
+            if (cb > 0) profile.combatLevel = cb;
+            modelDirty = true;
+        }
         double score = DEFAULT_TARGET_SCORE;
         if (profile != null) {
             long timeSinceSeen = System.currentTimeMillis() - profile.lastSeenAt;
@@ -263,7 +320,6 @@ public class AIAssistant {
     }
 
     public void saveModel() {
-        if (!modelDirty) return;
         try {
             Path path = Path.of(AI_DATA_PATH);
             Path parent = path.getParent();
@@ -307,8 +363,10 @@ public class AIAssistant {
 
     private void conditionalSave() {
         long now = System.currentTimeMillis();
-        if (now - lastSaveTime >= SAVE_INTERVAL_MS) {
+        if (modelDirty && now - lastSaveTime >= SAVE_INTERVAL_MS) {
             saveModel();
+            lastSaveTime = now;
+        } else if (now - lastSaveTime >= SAVE_INTERVAL_MS) {
             lastSaveTime = now;
         }
     }

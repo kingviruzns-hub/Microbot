@@ -246,19 +246,25 @@ public class PlayerStats {
     }
 
     private long getTotalCombatXp() {
-        return Microbot.getClientThread().runOnClientThreadOptional(() -> {
-            long total = 0;
-            Skill[] combatSkills = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.HITPOINTS, Skill.RANGED, Skill.PRAYER, Skill.MAGIC};
-            for (Skill skill : combatSkills) {
-                try {
-                    total += Microbot.getClient().getSkillExperience(skill);
-                } catch (Exception e) {
-                    int level = Microbot.getClient().getRealSkillLevel(skill);
-                    total += Experience.getXpForLevel(level);
+        try {
+            var clientThread = Microbot.getClientThread();
+            if (clientThread == null) return 0L;
+            return clientThread.runOnClientThreadOptional(() -> {
+                long total = 0;
+                Skill[] combatSkills = {Skill.ATTACK, Skill.STRENGTH, Skill.DEFENCE, Skill.HITPOINTS, Skill.RANGED, Skill.PRAYER, Skill.MAGIC};
+                for (Skill skill : combatSkills) {
+                    try {
+                        total += Microbot.getClient().getSkillExperience(skill);
+                    } catch (Exception e) {
+                        int level = Microbot.getClient().getRealSkillLevel(skill);
+                        total += Experience.getXpForLevel(level);
+                    }
                 }
-            }
-            return total;
-        }).orElse(0L);
+                return total;
+            }).orElse(0L);
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
     private String formatRuntime(long ms) {
