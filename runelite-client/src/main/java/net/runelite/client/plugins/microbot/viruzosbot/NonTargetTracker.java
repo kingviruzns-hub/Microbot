@@ -67,6 +67,9 @@ public class NonTargetTracker {
     }
 
     public void record(net.runelite.api.Player player, String location) {
+        if (player instanceof net.runelite.client.plugins.microbot.util.player.Rs2PlayerModel) {
+            player = ((net.runelite.client.plugins.microbot.util.player.Rs2PlayerModel) player).getPlayer();
+        }
         if (player == null || !exists(player) || player.getName() == null) return;
         net.runelite.api.coords.WorldPoint tile = getWorldLocation(player);
         if (tile == null) return;

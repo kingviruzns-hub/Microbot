@@ -26,12 +26,17 @@ public class PlayerStats {
     private long lastSaveMs = System.currentTimeMillis();
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>(){}.getType();
+    private static final Type MAP_TYPE = new TypeToken<LinkedHashMap<String, Object>>(){}.getType();
 
     public void startSession() {
         sessionStartMs = System.currentTimeMillis();
         currentSessionStartMs = sessionStartMs;
-        xpAtStart = getTotalCombatXp();
+        long currentXp = getTotalCombatXp();
+        if (currentXp > 0) {
+            xpAtStart = currentXp;
+        } else {
+            xpAtStart = 0;
+        }
         load();
     }
 
@@ -45,9 +50,18 @@ public class PlayerStats {
 
     public void updateXpEarned() {
         long currentXp = getTotalCombatXp();
+        if (currentXp <= 0) {
+            return;
+        }
+        if (xpAtStart <= 0) {
+            xpAtStart = currentXp;
+            return;
+        }
         long gained = currentXp - xpAtStart;
         if (gained > 0) {
             totalXpEarned += gained;
+            xpAtStart = currentXp;
+        } else if (gained < 0) {
             xpAtStart = currentXp;
         }
     }
@@ -64,7 +78,13 @@ public class PlayerStats {
     public void save() {
         updateXpEarned();
         long now = System.currentTimeMillis();
+        if (sessionStartMs <= 0) {
+            sessionStartMs = now;
+        }
         long currentRuntimeMs = now - sessionStartMs;
+        if (currentRuntimeMs < 0) {
+            currentRuntimeMs = 0;
+        }
         totalRuntimeMs.addAndGet(currentRuntimeMs);
         sessionStartMs = now;
 
@@ -95,30 +115,63 @@ public class PlayerStats {
 
     public void load() {
         Path path = Paths.get(Config.getStatsFilePath());
-        if (!Files.exists(path)) return;
+        if (!Files.exists(path)) {
+            sessionStartMs = System.currentTimeMillis();
+            currentSessionStartMs = sessionStartMs;
+            long currentXp = getTotalCombatXp();
+            if (currentXp > 0) {
+                xpAtStart = currentXp;
+            }
+            return;
+        }
 
         try {
             String json = Files.readString(path);
             Map<String, Object> data = GSON.fromJson(json, MAP_TYPE);
-            if (data == null) return;
+            if (data == null) {
+                sessionStartMs = System.currentTimeMillis();
+                currentSessionStartMs = sessionStartMs;
+                long currentXp = getTotalCombatXp();
+                if (currentXp > 0) {
+                    xpAtStart = currentXp;
+                }
+                return;
+            }
 
             if (data.containsKey("RuntimeMs")) {
-                totalRuntimeMs.set(((Number) data.get("RuntimeMs")).longValue());
+                Object runtimeObj = data.get("RuntimeMs");
+                if (runtimeObj instanceof Number) {
+                    totalRuntimeMs.set(((Number) runtimeObj).longValue());
+                }
             }
             if (data.containsKey("XP Earned")) {
-                totalXpEarned = ((Number) data.get("XP Earned")).longValue();
+                Object xpObj = data.get("XP Earned");
+                if (xpObj instanceof Number) {
+                    totalXpEarned = ((Number) xpObj).longValue();
+                }
             }
             if (data.containsKey("Most Bullied")) {
-                List<Map<String, Object>> list = GSON.fromJson(
-                        GSON.toJson(data.get("Most Bullied")),
-                        new TypeToken<List<Map<String, Object>>>(){}.getType()
-                );
-                bulliedAttacks.clear();
-                if (list != null) {
-                    for (Map<String, Object> entry : list) {
-                        String name = (String) entry.get("name");
-                        int attacks = ((Number) entry.get("attacks")).intValue();
-                        if (name != null) bulliedAttacks.put(name, attacks);
+                Object bulliedObj = data.get("Most Bullied");
+                if (bulliedObj != null) {
+                    List<Map<String, Object>> list = GSON.fromJson(
+                            GSON.toJson(bulliedObj),
+                            new TypeToken<List<Map<String, Object>>>() {
+                            }.getType()
+                    );
+                    bulliedAttacks.clear();
+                    if (list != null) {
+                        for (Map<String, Object> entry : list) {
+                            if (entry == null) continue;
+                            Object nameObj = entry.get("name");
+                            Object attacksObj = entry.get("attacks");
+                            if (nameObj instanceof String) {
+                                String name = (String) nameObj;
+                                int attacks = attacksObj instanceof Number ? ((Number) attacksObj).intValue() : 0;
+                                if (attacks > 0) {
+                                    bulliedAttacks.put(name, attacks);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -127,7 +180,15 @@ public class PlayerStats {
         }
 
         sessionStartMs = System.currentTimeMillis();
-        xpAtStart = getTotalCombatXp();
+        if (currentSessionStartMs == 0L) {
+            currentSessionStartMs = sessionStartMs;
+        }
+        long currentXp = getTotalCombatXp();
+        if (currentXp > 0) {
+            xpAtStart = currentXp;
+        } else if (xpAtStart <= 0) {
+            xpAtStart = 0;
+        }
     }
 
     public String getRuntimeString() {

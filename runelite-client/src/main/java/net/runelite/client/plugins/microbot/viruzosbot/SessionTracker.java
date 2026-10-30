@@ -34,10 +34,10 @@ public class SessionTracker {
         long now = System.currentTimeMillis();
         if (lastAttackMs > 0) {
             long gap = now - lastAttackMs;
+            attackTimes[attackTimeIndex] = gap;
+            attackTimeIndex = (attackTimeIndex + 1) % attackTimes.length;
             if (attackTimeCount < attackTimes.length) {
-                attackTimes[attackTimeIndex] = gap;
-                attackTimeIndex = (attackTimeIndex + 1) % attackTimes.length;
-                attackTimeCount = Math.min(attackTimeCount + 1, attackTimes.length);
+                attackTimeCount++;
             }
         }
         lastAttackMs = now;
@@ -104,8 +104,12 @@ public class SessionTracker {
     }
 
     public double getCombatTimePercentage() {
+        long combatTimeMs = totalCombatTimeMs;
+        if (inCombat) {
+            combatTimeMs += System.currentTimeMillis() - combatSessionStartMs;
+        }
         long elapsed = System.currentTimeMillis() - sessionStartMs;
-        return elapsed > 0 ? (double) totalCombatTimeMs / elapsed * 100.0 : 0;
+        return elapsed > 0 ? (double) combatTimeMs / elapsed * 100.0 : 0;
     }
 
     public long getSessionElapsed() {
@@ -147,9 +151,17 @@ public class SessionTracker {
         timesTargetRan = 0;
         reportsFiled = 0;
         deaths = 0;
+        playersScanned = 0;
         dragAttempts = 0;
+        antiLureTriggers = 0;
+        mistakesMade = 0;
+        lastAttackMs = 0L;
+        totalCombatTimeMs = 0L;
+        combatSessionStartMs = 0L;
+        inCombat = false;
+        attackTimeIndex = 0;
         attackTimeCount = 0;
-        totalCombatTimeMs = 0;
+        nextTickSaveMs = 0L;
     }
 
     public void drawStats(Graphics g, int x, int y, double fatigueFactor) {
