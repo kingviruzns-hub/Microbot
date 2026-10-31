@@ -2,6 +2,7 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
+import net.runelite.client.plugins.microbot.viruzosbot.Config;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
@@ -9,7 +10,15 @@ import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import lombok.Getter;
 
 import java.awt.*;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.ThreadLocalRandom;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 public class HumanBehavior {
     private static final int SCREEN_WIDTH = 765;
@@ -31,6 +40,7 @@ public class HumanBehavior {
         this.totalActions = 0;
         this.currentFatigueLevel = 0;
         scheduleNextDistraction();
+        load();
     }
 
     public void onAction() {
@@ -219,6 +229,53 @@ public class HumanBehavior {
         sessionStartTime = System.currentTimeMillis();
         totalActions = 0;
         currentFatigueLevel = 0;
+    }
+
+    public void saveTrackerInfo() {
+        save();
+    }
+
+    public void save() {
+        try {
+            Path path = Paths.get(Config.getHumanBehaviorFilePath());
+            Path parent = path.getParent();
+            if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
+            java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("sessionStartTime", sessionStartTime);
+            data.put("totalActions", totalActions);
+            data.put("currentFatigueLevel", currentFatigueLevel);
+            data.put("nextDistractionTime", nextDistractionTime);
+            data.put("lastNaturalMouseMove", lastNaturalMouseMove);
+            Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+            Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().create().toJson(data));
+            try {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            System.out.println("HumanBehavior save error: " + e.getMessage());
+        }
+    }
+
+    public void load() {
+        try {
+            Path path = Paths.get(Config.getHumanBehaviorFilePath());
+            if (!Files.exists(path)) return;
+            String json = Files.readString(path);
+            if (json == null || json.trim().isEmpty()) return;
+            Gson gson = new Gson();
+            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<java.util.Map<String, Object>>(){}.getType();
+            java.util.Map<String, Object> data = gson.fromJson(json, type);
+            if (data == null) return;
+            if (data.get("sessionStartTime") instanceof Number) sessionStartTime = ((Number)data.get("sessionStartTime")).longValue();
+            if (data.get("totalActions") instanceof Number) totalActions = ((Number)data.get("totalActions")).intValue();
+            if (data.get("currentFatigueLevel") instanceof Number) currentFatigueLevel = ((Number)data.get("currentFatigueLevel")).intValue();
+            if (data.get("nextDistractionTime") instanceof Number) nextDistractionTime = ((Number)data.get("nextDistractionTime")).longValue();
+            if (data.get("lastNaturalMouseMove") instanceof Number) lastNaturalMouseMove = ((Number)data.get("lastNaturalMouseMove")).longValue();
+        } catch (Exception e) {
+            System.out.println("HumanBehavior load error: " + e.getMessage());
+        }
     }
 
     public long getSessionDurationMinutes() {

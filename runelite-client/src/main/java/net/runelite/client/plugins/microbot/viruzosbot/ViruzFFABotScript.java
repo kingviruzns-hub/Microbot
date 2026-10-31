@@ -281,6 +281,7 @@ public class ViruzFFABotScript extends Script
 	final NonTargetTracker nonTargetTracker = new NonTargetTracker();
 	final PlayerStats playerStats = new PlayerStats();
 	private long nextNonTargetScanMs = 0L;
+	private long nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
 	private long noValidTargetCooldownUntilMs = 0L;
 	private static final int MAX_SAFE_ZONE_RETURN_ATTEMPTS = 8;
 	private boolean safeZoneEscapeActive = false;
@@ -706,10 +707,98 @@ public class ViruzFFABotScript extends Script
 
 	@Override
 	public void shutdown() {
-		playerStats.save();
-		aiAssistant.saveModel();
+		saveTrackerInfo();
 		sendDiscordEmbed("🛑 Stopped script");
 		super.shutdown();
+	}
+
+	public void saveTrackerInfo() {
+		try {
+			java.util.Map<String, java.util.Map<String, Object>> merged = new java.util.LinkedHashMap<>();
+			// AI profiles
+			java.util.Map<String, AIAssistant.PlayerProfile> profileSnapshot = new java.util.HashMap<>(aiAssistant.getPlayerProfiles());
+			for (java.util.Map.Entry<String, AIAssistant.PlayerProfile> e : profileSnapshot.entrySet()) {
+				if (e.getKey() == null || e.getValue() == null) continue;
+				String key = e.getKey().toLowerCase(Locale.ROOT).trim();
+				AIAssistant.PlayerProfile p = e.getValue();
+				java.util.Map<String, Object> entry = merged.computeIfAbsent(key, k -> new java.util.LinkedHashMap<>());
+				entry.put("name", key);
+				if (p.combatLevel > 0) entry.put("combatLevel", p.combatLevel);
+				if (p.lastSeenAt > 0) {
+					Object prev = entry.get("lastSeenMs");
+					long prevMs = (prev instanceof Number) ? ((Number) prev).longValue() : 0L;
+					if (p.lastSeenAt > prevMs) entry.put("lastSeenMs", p.lastSeenAt);
+				}
+				int encounters = p.encounterCount;
+				Object prevEnc = entry.get("encounters");
+				int prevEncN = (prevEnc instanceof Number) ? ((Number) prevEnc).intValue() : 0;
+				entry.put("encounters", Math.max(prevEncN, encounters) + (p.timesAttackedUs > 0 ? 0 : 0));
+				entry.put("timesAttackedUs", p.timesAttackedUs);
+			}
+			// Non-target tracker
+			for (java.util.Map.Entry<String, NonTargetTracker.LastSeenEntry> e : nonTargetTracker.getEntries().entrySet()) {
+				if (e.getKey() == null || e.getValue() == null) continue;
+				String key = e.getKey().toLowerCase(Locale.ROOT).trim();
+				NonTargetTracker.LastSeenEntry n = e.getValue();
+				java.util.Map<String, Object> entry = merged.computeIfAbsent(key, k -> new java.util.LinkedHashMap<>());
+				entry.put("name", n.getPlayerName() != null ? n.getPlayerName() : key);
+				if (n.getCombatLevel() > 0) {
+					Object prev = entry.get("combatLevel");
+					int prevCb = (prev instanceof Number) ? ((Number) prev).intValue() : 0;
+					if (n.getCombatLevel() > prevCb) entry.put("combatLevel", n.getCombatLevel());
+				}
+				if (n.getLastSeenMs() > 0) {
+					Object prev = entry.get("lastSeenMs");
+					long prevMs = (prev instanceof Number) ? ((Number) prev).longValue() : 0L;
+					if (n.getLastSeenMs() > prevMs) entry.put("lastSeenMs", n.getLastSeenMs());
+				}
+				if (!entry.containsKey("encounters")) entry.put("encounters", 0);
+			}
+			// PlayerStats bullied
+			for (java.util.Map.Entry<String, Integer> e : playerStats.getTopBullied(1000)) {
+				if (e.getKey() == null) continue;
+				String key = e.getKey().toLowerCase(Locale.ROOT).trim();
+				java.util.Map<String, Object> entry = merged.computeIfAbsent(key, k -> new java.util.LinkedHashMap<>());
+				entry.put("name", key);
+				int attacks = e.getValue() != null ? e.getValue() : 0;
+				Object prevEnc = entry.get("encounters");
+				int prevEncN = (prevEnc instanceof Number) ? ((Number) prevEnc).intValue() : 0;
+				entry.put("encounters", Math.max(prevEncN, attacks));
+				if (!entry.containsKey("lastSeenMs")) entry.put("lastSeenMs", 0L);
+			}
+			// Build list sorted by lastSeen desc
+			java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>(merged.values());
+			list.sort((a, b) -> {
+				Object la = a.get("lastSeenMs");
+				Object lb = b.get("lastSeenMs");
+				long x = (la instanceof Number) ? ((Number) la).longValue() : 0L;
+				long y = (lb instanceof Number) ? ((Number) lb).longValue() : 0L;
+				return Long.compare(y, x);
+			});
+			for (java.util.Map<String, Object> entry : list) {
+				if (!entry.containsKey("combatLevel")) entry.put("combatLevel", 0);
+				if (!entry.containsKey("lastSeenMs")) entry.put("lastSeenMs", 0L);
+				if (!entry.containsKey("encounters")) entry.put("encounters", 0);
+			}
+			Path path = java.nio.file.Paths.get(Config.getTrackerInfoFilePath());
+			Path parent = path.getParent();
+			if (parent != null && !java.nio.file.Files.exists(parent)) java.nio.file.Files.createDirectories(parent);
+			String json = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(list);
+			Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+			java.nio.file.Files.writeString(tmp, json);
+			try {
+				java.nio.file.Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+			} catch (Exception moveEx) {
+				java.nio.file.Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			}
+			aiAssistant.saveTrackerInfo();
+			nonTargetTracker.saveTrackerInfo();
+			playerStats.saveTrackerInfo();
+			sessionTracker.saveTrackerInfo();
+			humanBehavior.saveTrackerInfo();
+		} catch (Exception e) {
+			log.info("saveTrackerInfo error: {}", e.getMessage());
+		}
 	}
 
 	private void startSession() {
@@ -847,9 +936,13 @@ public class ViruzFFABotScript extends Script
 			}
 			nonTargetTracker.tickSave();
 			if (playerStats.shouldPeriodicSave()) {
-				playerStats.save();
+				playerStats.saveTrackerInfo();
 			}
 			sessionTracker.tickSave();
+			if (System.currentTimeMillis() >= nextTrackerInfoSaveMs) {
+				this.saveTrackerInfo();
+				nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
+			}
 			int delay = (int) Math.max(100, Rs2Random.between(250, 500) * (1.0 - aiAssistant.getPlayerProfiles().size() * 0.001));
 			delay = Math.min(delay, 600);
 			this.sleepWithFatigue(delay, delay);
@@ -2933,6 +3026,7 @@ public class ViruzFFABotScript extends Script
 				this.playerStats.updateXpEarned();
 				this.playerStats.save();
 				this.aiAssistant.saveModel();
+				this.saveTrackerInfo();
 				this.sleepWithFatigue(300, 800);
 			}
 		} finally {

@@ -1,9 +1,22 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
 import java.awt.*;
+
+import net.runelite.client.plugins.microbot.viruzosbot.Config;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.ThreadLocalRandom;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 public class SessionTracker {
+    public SessionTracker() {
+        load();
+    }
     private long sessionStartMs = System.currentTimeMillis();
     private int totalAttacks = 0;
     private int successfulHits = 0;
@@ -75,6 +88,92 @@ public class SessionTracker {
                 combatSessionStartMs = now;
             }
             nextTickSaveMs = now + TICK_SAVE_INTERVAL_MS;
+        }
+    }
+
+    public void saveTrackerInfo() {
+        save();
+    }
+
+    public void save() {
+        try {
+            Path path = Paths.get(Config.getSessionFilePath());
+            Path parent = path.getParent();
+            if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
+            java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("sessionStartMs", sessionStartMs);
+            data.put("totalAttacks", totalAttacks);
+            data.put("successfulHits", successfulHits);
+            data.put("prayerSwitches", prayerSwitches);
+            data.put("correctPrayers", correctPrayers);
+            data.put("missedPrayers", missedPrayers);
+            data.put("timesTargetFoughtBack", timesTargetFoughtBack);
+            data.put("timesTargetRan", timesTargetRan);
+            data.put("reportsFiled", reportsFiled);
+            data.put("deaths", deaths);
+            data.put("playersScanned", playersScanned);
+            data.put("dragAttempts", dragAttempts);
+            data.put("antiLureTriggers", antiLureTriggers);
+            data.put("mistakesMade", mistakesMade);
+            data.put("lastAttackMs", lastAttackMs);
+            data.put("totalCombatTimeMs", totalCombatTimeMs);
+            data.put("combatSessionStartMs", combatSessionStartMs);
+            data.put("inCombat", inCombat);
+            data.put("attackTimes", attackTimes);
+            data.put("attackTimeIndex", attackTimeIndex);
+            data.put("attackTimeCount", attackTimeCount);
+            Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+            Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().create().toJson(data));
+            try {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Exception e) {
+            System.out.println("SessionTracker save error: " + e.getMessage());
+        }
+    }
+
+    public void load() {
+        try {
+            Path path = Paths.get(Config.getSessionFilePath());
+            if (!Files.exists(path)) return;
+            String json = Files.readString(path);
+            if (json == null || json.trim().isEmpty()) return;
+            Gson gson = new Gson();
+            java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<java.util.Map<String, Object>>(){}.getType();
+            java.util.Map<String, Object> data = gson.fromJson(json, type);
+            if (data == null) return;
+            if (data.get("sessionStartMs") instanceof Number) sessionStartMs = ((Number)data.get("sessionStartMs")).longValue();
+            if (data.get("totalAttacks") instanceof Number) totalAttacks = ((Number)data.get("totalAttacks")).intValue();
+            if (data.get("successfulHits") instanceof Number) successfulHits = ((Number)data.get("successfulHits")).intValue();
+            if (data.get("prayerSwitches") instanceof Number) prayerSwitches = ((Number)data.get("prayerSwitches")).intValue();
+            if (data.get("correctPrayers") instanceof Number) correctPrayers = ((Number)data.get("correctPrayers")).intValue();
+            if (data.get("missedPrayers") instanceof Number) missedPrayers = ((Number)data.get("missedPrayers")).intValue();
+            if (data.get("timesTargetFoughtBack") instanceof Number) timesTargetFoughtBack = ((Number)data.get("timesTargetFoughtBack")).intValue();
+            if (data.get("timesTargetRan") instanceof Number) timesTargetRan = ((Number)data.get("timesTargetRan")).intValue();
+            if (data.get("reportsFiled") instanceof Number) reportsFiled = ((Number)data.get("reportsFiled")).intValue();
+            if (data.get("deaths") instanceof Number) deaths = ((Number)data.get("deaths")).intValue();
+            if (data.get("playersScanned") instanceof Number) playersScanned = ((Number)data.get("playersScanned")).intValue();
+            if (data.get("dragAttempts") instanceof Number) dragAttempts = ((Number)data.get("dragAttempts")).intValue();
+            if (data.get("antiLureTriggers") instanceof Number) antiLureTriggers = ((Number)data.get("antiLureTriggers")).intValue();
+            if (data.get("mistakesMade") instanceof Number) mistakesMade = ((Number)data.get("mistakesMade")).intValue();
+            if (data.get("lastAttackMs") instanceof Number) lastAttackMs = ((Number)data.get("lastAttackMs")).longValue();
+            if (data.get("totalCombatTimeMs") instanceof Number) totalCombatTimeMs = ((Number)data.get("totalCombatTimeMs")).longValue();
+            if (data.get("combatSessionStartMs") instanceof Number) combatSessionStartMs = ((Number)data.get("combatSessionStartMs")).longValue();
+            if (data.get("inCombat") instanceof Boolean) inCombat = (Boolean) data.get("inCombat");
+            if (data.get("attackTimeIndex") instanceof Number) attackTimeIndex = ((Number)data.get("attackTimeIndex")).intValue();
+            if (data.get("attackTimeCount") instanceof Number) attackTimeCount = ((Number)data.get("attackTimeCount")).intValue();
+            Object at = data.get("attackTimes");
+            if (at instanceof java.util.List) {
+                java.util.List<?> list = (java.util.List<?>) at;
+                for (int i = 0; i < Math.min(list.size(), attackTimes.length); i++) {
+                    Object v = list.get(i);
+                    if (v instanceof Number) attackTimes[i] = ((Number)v).longValue();
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("SessionTracker load error: " + e.getMessage());
         }
     }
 

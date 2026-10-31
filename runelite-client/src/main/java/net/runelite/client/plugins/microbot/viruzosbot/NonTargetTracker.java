@@ -114,10 +114,20 @@ public class NonTargetTracker {
             List<LastSeenEntry> list = new ArrayList<>(entries.values());
             list.sort(Comparator.comparingLong(e -> -e.lastSeenMs));
             String json = new com.google.gson.GsonBuilder().setPrettyPrinting().create().toJson(list);
-            Files.writeString(path, json);
+            Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+            Files.writeString(tmp, json);
+            try {
+                Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+                Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Exception e) {
             System.out.println("NonTargetTracker save error: " + e.getMessage());
         }
+    }
+
+    public void saveTrackerInfo() {
+        save();
     }
 
     private void load() {

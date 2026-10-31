@@ -18,7 +18,7 @@ public class Config {
     static {
         String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot";
         DEFAULT_CONFIG_PATH = basePath + File.separator + "config.properties";
-        CONFIG_FILE_PATH = System.getProperty("C:\\Users\\4Twen\\.microbot", DEFAULT_CONFIG_PATH);
+        CONFIG_FILE_PATH = System.getProperty("microbot.config.path", DEFAULT_CONFIG_PATH);
         FILE_PATH = basePath + File.separator + "nslist.txt";
         load();
     }
@@ -85,5 +85,17 @@ public class Config {
 
     public static String getStatsFilePath() {
         return FILE_PATH.replace("nslist.txt", "stats.json");
+    }
+
+    public static String getTrackerInfoFilePath() {
+        return FILE_PATH.replace("nslist.txt", "tracker_info.json");
+    }
+
+    public static String getSessionFilePath() {
+        return FILE_PATH.replace("nslist.txt", "session.json");
+    }
+
+    public static String getHumanBehaviorFilePath() {
+        return FILE_PATH.replace("nslist.txt", "human_behavior.json");
     }
 }

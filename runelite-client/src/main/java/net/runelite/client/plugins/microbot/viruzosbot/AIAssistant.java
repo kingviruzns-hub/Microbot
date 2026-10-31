@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +36,7 @@ public class AIAssistant {
     @Getter
     private final Map<String, PlayerProfile> playerProfiles = new ConcurrentHashMap<>();
     private final Map<Integer, Long> animationCooldowns = new ConcurrentHashMap<>();
-    private final List<CombatEncounter> recentEncounters = new LinkedList<>();
+    private final List<CombatEncounter> recentEncounters = Collections.synchronizedList(new LinkedList<>());
     private final Map<String, AnimationPattern> animationPatterns = new ConcurrentHashMap<>();
     private long lastSaveTime = System.currentTimeMillis();
     private static final long SAVE_INTERVAL_MS = 5_000L;
@@ -181,13 +182,13 @@ public class AIAssistant {
             profile.lastSeenAt = System.currentTimeMillis();
             modelDirty = true;
         } else {
-            profile.lastSeenAt = System.currentTimeMillis();
             int cb = getCombatLevel(candidate);
             if (cb > 0) profile.combatLevel = cb;
             modelDirty = true;
         }
         double score = DEFAULT_TARGET_SCORE;
         long timeSinceSeen = System.currentTimeMillis() - profile.lastSeenAt;
+        profile.lastSeenAt = System.currentTimeMillis();
         double decay = Math.exp(-timeSinceSeen / (double) THREAT_DECAY_MS);
         double aggressiveness = (double) profile.timesFoughtBack / Math.max(1, profile.encounterCount);
         double cowardice = (double) profile.timesRanToSafe / Math.max(1, profile.encounterCount);
@@ -323,13 +324,27 @@ public class AIAssistant {
             Path path = Path.of(AI_DATA_PATH);
             Path parent = path.getParent();
             if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
-            ModelData data = new ModelData(new HashMap<>(playerProfiles), new LinkedList<>(recentEncounters), new HashMap<>(animationPatterns));
+            List<CombatEncounter> encounterSnapshot;
+            synchronized (recentEncounters) {
+                encounterSnapshot = new ArrayList<>(recentEncounters);
+            }
+            ModelData data = new ModelData(new HashMap<>(playerProfiles), encounterSnapshot, new HashMap<>(animationPatterns));
             String json = new GsonBuilder().setPrettyPrinting().create().toJson(data);
-            Files.writeString(path, json);
+            Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+            Files.writeString(tmp, json);
+            try {
+                Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+                Files.move(tmp, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
             modelDirty = false;
         } catch (Exception e) {
             System.out.println("[AIAssistant] Failed to save model: " + e.getMessage());
         }
+    }
+
+    public void saveTrackerInfo() {
+        saveModel();
     }
 
     public boolean removeProfile(String playerName) {
@@ -375,16 +390,36 @@ public class AIAssistant {
             Path path = Path.of(AI_DATA_PATH);
             if (!Files.exists(path)) return;
             String json = Files.readString(path);
+            if (json == null || json.trim().isEmpty()) return;
             Gson gson = new Gson();
             Type type = new TypeToken<ModelData>(){}.getType();
             ModelData data = gson.fromJson(json, type);
             if (data != null) {
-                if (data.profiles != null) playerProfiles.putAll(data.profiles);
-                if (data.encounters != null) recentEncounters.addAll(data.encounters);
-                if (data.patterns != null) animationPatterns.putAll(data.patterns);
+                if (data.profiles != null) {
+                    for (Map.Entry<String, PlayerProfile> e : data.profiles.entrySet()) {
+                        if (e.getKey() == null || e.getValue() == null) continue;
+                        PlayerProfile p = e.getValue();
+                        if (p.lastSeenAt <= 0) p.lastSeenAt = System.currentTimeMillis();
+                        if (p.combatLevel < 0) p.combatLevel = 0;
+                        playerProfiles.put(e.getKey().toLowerCase(Locale.ROOT).trim(), p);
+                    }
+                }
+                synchronized (recentEncounters) {
+                    if (data.encounters != null) {
+                        for (CombatEncounter ce : data.encounters) {
+                            if (ce != null && ce.targetName != null) recentEncounters.add(ce);
+                        }
+                    }
+                }
+                if (data.patterns != null) {
+                    for (Map.Entry<String, AnimationPattern> e : data.patterns.entrySet()) {
+                        if (e.getKey() == null || e.getValue() == null) continue;
+                        animationPatterns.put(e.getKey().toLowerCase(Locale.ROOT).trim(), e.getValue());
+                    }
+                }
             }
         } catch (Exception e) {
-            System.out.println("[AIAssistant] No prior model data found, starting fresh.");
+            System.out.println("[AIAssistant] No prior model data found, starting fresh: " + e.getMessage());
         }
     }
 

@@ -75,6 +75,10 @@ public class PlayerStats {
         return false;
     }
 
+    public void saveTrackerInfo() {
+        save();
+    }
+
     public void save() {
         updateXpEarned();
         long now = System.currentTimeMillis();
@@ -107,7 +111,13 @@ public class PlayerStats {
         try {
             Path parent = path.getParent();
             if (parent != null && !Files.exists(parent)) Files.createDirectories(parent);
-            Files.writeString(path, GSON.toJson(data));
+            Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+            Files.writeString(tmp, GSON.toJson(data));
+            try {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveEx) {
+                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             System.err.println("PlayerStats: Error saving stats.json: " + e.getMessage());
         }
