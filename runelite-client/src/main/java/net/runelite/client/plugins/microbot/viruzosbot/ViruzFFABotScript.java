@@ -2,6 +2,7 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.Getter;
 import lombok.Setter;
@@ -732,7 +733,7 @@ public class ViruzFFABotScript extends Script
 				int encounters = p.encounterCount;
 				Object prevEnc = entry.get("encounters");
 				int prevEncN = (prevEnc instanceof Number) ? ((Number) prevEnc).intValue() : 0;
-				entry.put("encounters", Math.max(prevEncN, encounters) + (p.timesAttackedUs > 0 ? 0 : 0));
+				entry.put("encounters", Math.max(prevEncN, encounters));
 				entry.put("timesAttackedUs", p.timesAttackedUs);
 			}
 			// Non-target tracker
@@ -2076,7 +2077,7 @@ public class ViruzFFABotScript extends Script
 			return;
 		}
 
-		boolean close = this.waitForTargetClose(target, localPlayer, DRAG_CLOSE_TIMEOUT_MS);
+		boolean close = this.waitForTargetClose(target, localPlayer);
 		int reengages = 0;
 		while (!close && reengages++ < DRAG_MAX_REENGAGE_ATTEMPTS && playerExists(target)) {
 			this.status = "Drag-Mode: target not following, re-attacking " + targetName;
@@ -2084,7 +2085,7 @@ public class ViruzFFABotScript extends Script
 				break;
 			}
 			this.dragTargetToPoint(target, targetKey, localPlayer, dragPoint);
-			close = this.waitForTargetClose(target, localPlayer, DRAG_CLOSE_TIMEOUT_MS);
+			close = this.waitForTargetClose(target, localPlayer);
 		}
 
 		if (!close) {
@@ -2181,8 +2182,8 @@ public class ViruzFFABotScript extends Script
 		return localTile.distanceTo(targetTile) <= DRAG_FOLLOW_DISTANCE;
 	}
 
-	private boolean waitForTargetClose(Rs2PlayerModel target, Rs2PlayerModel localPlayer, long timeoutMs) {
-		long deadline = System.currentTimeMillis() + timeoutMs;
+	private boolean waitForTargetClose(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
+		long deadline = System.currentTimeMillis() + ViruzFFABotScript.DRAG_CLOSE_TIMEOUT_MS;
 		while (System.currentTimeMillis() < deadline) {
 			if (!playerExists(target) || !playerExists(localPlayer)) {
 				return false;
@@ -2214,7 +2215,7 @@ public class ViruzFFABotScript extends Script
 
 		this.status = "Drag-Mode: running to safe zone";
 		this.log(this.status);
-		if (!this.walkDragPoint(safePoint, DRAG_ARRIVE_DISTANCE, DRAG_WALK_TIMEOUT_MS)) {
+		if (!this.walkDragPoint(safePoint)) {
 			this.status = "Drag-Mode: could not reach safe zone";
 			this.log(this.status);
 			return;
@@ -2226,7 +2227,7 @@ public class ViruzFFABotScript extends Script
 
 		this.status = "Drag-Mode: returning to Portal through safe zone";
 		this.log(this.status);
-		if (this.walkDragPoint(portalPoint, DRAG_ARRIVE_DISTANCE, DRAG_WALK_TIMEOUT_MS)) {
+		if (this.walkDragPoint(portalPoint)) {
 			this.status = "Drag-Mode: back at Portal";
 			this.lastSelectedLocationWalkFinishedAtMs = System.currentTimeMillis();
 		} else {
@@ -2235,11 +2236,11 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-	private boolean walkDragPoint(WorldPoint point, int distance, long timeoutMs) {
+	private boolean walkDragPoint(WorldPoint point) {
 		if (point == null) return false;
-		long deadline = System.currentTimeMillis() + timeoutMs;
+		long deadline = System.currentTimeMillis() + ViruzFFABotScript.DRAG_WALK_TIMEOUT_MS;
 		while (System.currentTimeMillis() < deadline) {
-			WalkerState state = Rs2Walker.walkStep(point, distance);
+			WalkerState state = Rs2Walker.walkStep(point, ViruzFFABotScript.DRAG_ARRIVE_DISTANCE);
 			if (state == WalkerState.ARRIVED) {
 				Rs2Walker.setTarget(null, "viruz: drag-mode walk complete");
 				return true;
@@ -3710,7 +3711,7 @@ public class ViruzFFABotScript extends Script
 		long lb = b.has("lastAttackOnUsAt") ? getJsonLong(b, "lastAttackOnUsAt") : 0L;
 		if (Math.max(la, lb) > 0) out.addProperty("lastAttackOnUsAt", Math.max(la, lb));
 		// gear: prefer latest non-empty.
-		if (!hasNonEmptyArray(latest, "gear") && hasNonEmptyArray(other, "gear")) {
+		if (!hasNonEmptyArray(latest) && hasNonEmptyArray(other)) {
 			out.add("gear", other.get("gear").deepCopy());
 		}
 		// threatScore: prefer latest.
@@ -3726,9 +3727,9 @@ public class ViruzFFABotScript extends Script
 		return out;
 	}
 
-	private static boolean hasNonEmptyArray(com.google.gson.JsonObject o, String field) {
-		if (o == null || !o.has(field)) return false;
-		com.google.gson.JsonElement e = o.get(field);
+	private static boolean hasNonEmptyArray(JsonObject o) {
+		if (o == null || !o.has("gear")) return false;
+		com.google.gson.JsonElement e = o.get("gear");
 		return e.isJsonArray() && e.getAsJsonArray().size() > 0;
 	}
 
