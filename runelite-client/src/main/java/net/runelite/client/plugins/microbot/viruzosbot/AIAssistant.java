@@ -117,9 +117,6 @@ public class AIAssistant {
         recordSeenPlayer(playerName, combatLevel);
     }
 
-    public void trackPlayer(String playerName, int combatLevel, String[] gear) {
-        recordSeenPlayer(playerName, combatLevel, gear);
-    }
 
     public void updateLastSeen(String playerName) {
         recordSeenPlayer(playerName, -1);
@@ -347,6 +344,26 @@ public class AIAssistant {
         saveModel();
     }
 
+    private void mergeProfile(PlayerProfile existing, PlayerProfile incoming) {
+        // Keep latest target/tracker info: max counts, newest lastSeenAt, highest combatLevel, latest gear.
+        existing.encounterCount = Math.max(existing.encounterCount, incoming.encounterCount);
+        existing.timesFoughtBack = Math.max(existing.timesFoughtBack, incoming.timesFoughtBack);
+        existing.timesRanToSafe = Math.max(existing.timesRanToSafe, incoming.timesRanToSafe);
+        existing.timesWeWon = Math.max(existing.timesWeWon, incoming.timesWeWon);
+        existing.timesAttackedUs = Math.max(existing.timesAttackedUs, incoming.timesAttackedUs);
+        existing.timesHitAndRan = Math.max(existing.timesHitAndRan, incoming.timesHitAndRan);
+        existing.consecutiveHitAndRuns = Math.max(existing.consecutiveHitAndRuns, incoming.consecutiveHitAndRuns);
+        if (incoming.combatLevel > existing.combatLevel) existing.combatLevel = incoming.combatLevel;
+        if (incoming.lastSeenAt > existing.lastSeenAt) {
+            existing.lastSeenAt = incoming.lastSeenAt;
+            if (incoming.gear != null && incoming.gear.length > 0) existing.gear = incoming.gear;
+            existing.lastSeenHp = incoming.lastSeenHp;
+            existing.threatScore = incoming.threatScore;
+            existing.status = incoming.status;
+        }
+        if (incoming.lastAttackOnUsAt > existing.lastAttackOnUsAt) existing.lastAttackOnUsAt = incoming.lastAttackOnUsAt;
+    }
+
     public boolean removeProfile(String playerName) {
         if (playerName == null || playerName.isEmpty()) return false;
         String key = playerName.toLowerCase();
@@ -390,7 +407,7 @@ public class AIAssistant {
             Path path = Path.of(AI_DATA_PATH);
             if (!Files.exists(path)) return;
             String json = Files.readString(path);
-            if (json == null || json.trim().isEmpty()) return;
+            if (json.trim().isEmpty()) return;
             Gson gson = new Gson();
             Type type = new TypeToken<ModelData>(){}.getType();
             ModelData data = gson.fromJson(json, type);
@@ -401,7 +418,13 @@ public class AIAssistant {
                         PlayerProfile p = e.getValue();
                         if (p.lastSeenAt <= 0) p.lastSeenAt = System.currentTimeMillis();
                         if (p.combatLevel < 0) p.combatLevel = 0;
-                        playerProfiles.put(e.getKey().toLowerCase(Locale.ROOT).trim(), p);
+                        String key = e.getKey().toLowerCase(Locale.ROOT).trim();
+                    PlayerProfile existing = playerProfiles.get(key);
+                    if (existing == null) {
+                        playerProfiles.put(key, p);
+                    } else {
+                        mergeProfile(existing, p);
+                    }
                     }
                 }
                 synchronized (recentEncounters) {

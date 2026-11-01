@@ -144,8 +144,15 @@ public class NonTargetTracker {
                     if (e == null || e.playerName == null) continue;
                     String key = e.playerName.toLowerCase(Locale.ROOT).trim();
                     LastSeenEntry existing = deduped.get(key);
-                    if (existing == null || e.lastSeenMs > existing.lastSeenMs) {
+                    if (existing == null) {
                         deduped.put(key, e);
+                    } else if (e.lastSeenMs > existing.lastSeenMs) {
+                        // keep latest tracker info, but preserve higher combat level
+                        if (e.combatLevel <= 0 && existing.combatLevel > 0) e.combatLevel = existing.combatLevel;
+                        else if (existing.combatLevel > e.combatLevel) e.combatLevel = existing.combatLevel;
+                        deduped.put(key, e);
+                    } else {
+                        if (existing.combatLevel < e.combatLevel) existing.combatLevel = e.combatLevel;
                     }
                 }
                 entries.putAll(deduped);

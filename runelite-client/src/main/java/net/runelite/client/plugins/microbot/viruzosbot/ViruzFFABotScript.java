@@ -808,6 +808,7 @@ public class ViruzFFABotScript extends Script
 		initializeAreaMap();
 		this.currentArea = this.areaMap.get(this.selectedLocation);
 		removeBlockedNamesFromFile(this.filePath);
+		this.saveTrackerInfo();
 		removeDuplicateNamesFromAllLists();
 		setNextPreventLogout();
 		readMainUserFile();
@@ -889,6 +890,7 @@ public class ViruzFFABotScript extends Script
 				}
 			}
 			if (now >= this.nextAttackListReloadAtMs && !isPlayerInCombat(localPlayer) && !isPlayerMoving(localPlayer)) {
+				this.saveTrackerInfo();
 				this.readMainUserFile();
 				this.loadList();
 				this.removeDuplicateNamesFromAllLists();
@@ -3549,18 +3551,26 @@ public class ViruzFFABotScript extends Script
 				for (String mapKey : new String[]{"profiles", "patterns"}) {
 					if (obj.has(mapKey) && obj.get(mapKey).isJsonObject()) {
 						com.google.gson.JsonObject map = obj.getAsJsonObject(mapKey);
-						com.google.gson.JsonObject deduped = new com.google.gson.JsonObject();
-						java.util.LinkedHashMap<String, com.google.gson.JsonElement> byLower = new java.util.LinkedHashMap<>();
+						java.util.LinkedHashMap<String, com.google.gson.JsonObject> byLower = new java.util.LinkedHashMap<>();
 						for (Map.Entry<String, com.google.gson.JsonElement> e : map.entrySet()) {
+							if (!e.getValue().isJsonObject()) continue;
 							String lower = e.getKey().toLowerCase(Locale.ROOT).trim();
-							if (byLower.containsKey(lower)) {
+							com.google.gson.JsonObject val = e.getValue().getAsJsonObject();
+							com.google.gson.JsonObject existing = byLower.get(lower);
+							if (existing == null) {
+								byLower.put(lower, val);
+							} else {
 								modified = true;
 								this.log("Removing duplicate name in " + fileLocation.getFileName() + ": " + e.getKey());
-							} else {
-								byLower.put(lower, e.getValue());
+								if ("profiles".equals(mapKey)) {
+									byLower.put(lower, mergeProfileJson(existing, val));
+								} else {
+									byLower.put(lower, mergePatternJson(existing, val));
+								}
 							}
 						}
-						for (Map.Entry<String, com.google.gson.JsonElement> e : byLower.entrySet()) {
+						com.google.gson.JsonObject deduped = new com.google.gson.JsonObject();
+						for (Map.Entry<String, com.google.gson.JsonObject> e : byLower.entrySet()) {
 							deduped.add(e.getKey(), e.getValue());
 						}
 						obj.add(mapKey, deduped);
@@ -3568,8 +3578,10 @@ public class ViruzFFABotScript extends Script
 				}
 				if (obj.has("encounters") && obj.get("encounters").isJsonArray()) {
 					com.google.gson.JsonArray arr = obj.getAsJsonArray("encounters");
+					// Keep the latest encounter per target (by timestamp) instead of blindly
+					// dropping later ones, so the most recent target/tracker info survives.
+					java.util.LinkedHashMap<String, com.google.gson.JsonObject> bestByTarget = new java.util.LinkedHashMap<>();
 					com.google.gson.JsonArray deduped = new com.google.gson.JsonArray();
-					java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
 					for (com.google.gson.JsonElement el : arr) {
 						String tname = null;
 						if (el.isJsonObject() && el.getAsJsonObject().has("targetName")) {
@@ -3578,14 +3590,26 @@ public class ViruzFFABotScript extends Script
 								tname = t.getAsString().toLowerCase(Locale.ROOT).trim();
 							}
 						}
-						if (tname != null && !tname.isEmpty()) {
-							if (!seen.add(tname)) {
-								modified = true;
-								this.log("Removing duplicate encounter in " + fileLocation.getFileName() + ": " + tname);
-								continue;
+						if (tname == null || tname.isEmpty()) {
+							deduped.add(el);
+							continue;
+						}
+						com.google.gson.JsonObject cur = el.getAsJsonObject();
+						com.google.gson.JsonObject prev = bestByTarget.get(tname);
+						if (prev == null) {
+							bestByTarget.put(tname, cur);
+						} else {
+							modified = true;
+							this.log("Removing duplicate encounter in " + fileLocation.getFileName() + ": " + tname);
+							long curTs = getJsonLong(cur, "timestamp");
+							long prevTs = getJsonLong(prev, "timestamp");
+							if (curTs >= prevTs) {
+								bestByTarget.put(tname, cur);
 							}
 						}
-						deduped.add(el);
+					}
+					for (com.google.gson.JsonObject o : bestByTarget.values()) {
+						deduped.add(o);
 					}
 					obj.add("encounters", deduped);
 				}
@@ -3614,11 +3638,16 @@ public class ViruzFFABotScript extends Script
 					} else {
 						modified = true;
 						this.log("Removing duplicate name in " + fileLocation.getFileName() + ": " + key);
-						boolean keepNewer = el.isJsonObject() && existing.isJsonObject()
-								&& el.getAsJsonObject().has("lastSeenMs") && existing.getAsJsonObject().has("lastSeenMs")
-								&& el.getAsJsonObject().get("lastSeenMs").getAsLong() > existing.getAsJsonObject().get("lastSeenMs").getAsLong();
-						if (keepNewer) {
-							byLower.put(key, el);
+						if (el.isJsonObject() && existing.isJsonObject()) {
+							com.google.gson.JsonObject merged = mergeLastSeenJson(existing.getAsJsonObject(), el.getAsJsonObject());
+							byLower.put(key, merged);
+						} else {
+							boolean keepNewer = el.isJsonObject() && existing.isJsonObject()
+									&& el.getAsJsonObject().has("lastSeenMs") && existing.getAsJsonObject().has("lastSeenMs")
+									&& el.getAsJsonObject().get("lastSeenMs").getAsLong() > existing.getAsJsonObject().get("lastSeenMs").getAsLong();
+							if (keepNewer) {
+								byLower.put(key, el);
+							}
 						}
 					}
 				}
@@ -3640,6 +3669,104 @@ public class ViruzFFABotScript extends Script
 		} catch (Exception e) {
 			this.log("Error in removeDuplicateJsonNames for " + fileLocation.getFileName() + ": " + e);
 		}
+	}
+
+	private static long getJsonLong(com.google.gson.JsonObject o, String field) {
+		if (o == null || !o.has(field)) return 0L;
+		com.google.gson.JsonElement e = o.get(field);
+		if (e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isNumber()) {
+			return e.getAsLong();
+		}
+		return 0L;
+	}
+
+	private static com.google.gson.JsonObject mergeProfileJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
+		com.google.gson.JsonObject out = new com.google.gson.JsonObject();
+		// Start from the entry with the newer lastSeenAt (latest target info).
+		long aSeen = getJsonLong(a, "lastSeenAt");
+		long bSeen = getJsonLong(b, "lastSeenAt");
+		com.google.gson.JsonObject latest = (bSeen >= aSeen) ? b : a;
+		com.google.gson.JsonObject other = (bSeen >= aSeen) ? a : b;
+		for (String k : latest.keySet()) {
+			out.add(k, latest.get(k).deepCopy());
+		}
+		// Merge count fields by taking the max so accumulated tracker info is preserved.
+		for (String field : new String[]{"encounterCount", "timesFoughtBack", "timesRanToSafe", "timesWeWon",
+				"timesAttackedUs", "timesHitAndRan", "consecutiveHitAndRuns"}) {
+			long va = a.has(field) ? getJsonLong(a, field) : 0L;
+			long vb = b.has(field) ? getJsonLong(b, field) : 0L;
+			if (va > 0 || vb > 0) {
+				out.addProperty(field, Math.max(va, vb));
+			}
+		}
+		// combatLevel: keep the highest known.
+		long ca = a.has("combatLevel") ? getJsonLong(a, "combatLevel") : 0L;
+		long cb = b.has("combatLevel") ? getJsonLong(b, "combatLevel") : 0L;
+		if (Math.max(ca, cb) > 0) out.addProperty("combatLevel", Math.max(ca, cb));
+		// lastSeenAt: keep the newest.
+		out.addProperty("lastSeenAt", Math.max(aSeen, bSeen));
+		// lastAttackOnUsAt: keep the newest.
+		long la = a.has("lastAttackOnUsAt") ? getJsonLong(a, "lastAttackOnUsAt") : 0L;
+		long lb = b.has("lastAttackOnUsAt") ? getJsonLong(b, "lastAttackOnUsAt") : 0L;
+		if (Math.max(la, lb) > 0) out.addProperty("lastAttackOnUsAt", Math.max(la, lb));
+		// gear: prefer latest non-empty.
+		if (!hasNonEmptyArray(latest, "gear") && hasNonEmptyArray(other, "gear")) {
+			out.add("gear", other.get("gear").deepCopy());
+		}
+		// threatScore: prefer latest.
+		if (latest.has("threatScore")) out.add("threatScore", latest.get("threatScore").deepCopy());
+		// status: prefer latest non-null.
+		if (latest.has("status") && !latest.get("status").isJsonNull()) {
+			out.add("status", latest.get("status").deepCopy());
+		} else if (other.has("status") && !other.get("status").isJsonNull()) {
+			out.add("status", other.get("status").deepCopy());
+		}
+		// lastSeenHp: prefer latest if present.
+		if (latest.has("lastSeenHp")) out.add("lastSeenHp", latest.get("lastSeenHp").deepCopy());
+		return out;
+	}
+
+	private static boolean hasNonEmptyArray(com.google.gson.JsonObject o, String field) {
+		if (o == null || !o.has(field)) return false;
+		com.google.gson.JsonElement e = o.get(field);
+		return e.isJsonArray() && e.getAsJsonArray().size() > 0;
+	}
+
+	private static com.google.gson.JsonObject mergePatternJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
+		com.google.gson.JsonObject out = new com.google.gson.JsonObject();
+		// recentAnims: concatenate (trim to 20) to preserve latest activity.
+		com.google.gson.JsonArray anims = new com.google.gson.JsonArray();
+		if (a.has("recentAnims") && a.get("recentAnims").isJsonArray()) {
+			for (com.google.gson.JsonElement e : a.getAsJsonArray("recentAnims")) anims.add(e.deepCopy());
+		}
+		if (b.has("recentAnims") && b.get("recentAnims").isJsonArray()) {
+			for (com.google.gson.JsonElement e : b.getAsJsonArray("recentAnims")) anims.add(e.deepCopy());
+		}
+		while (anims.size() > 20) anims.remove(0);
+		out.add("recentAnims", anims);
+		// count: sum.
+		long ca = a.has("count") ? getJsonLong(a, "count") : 0L;
+		long cb = b.has("count") ? getJsonLong(b, "count") : 0L;
+		out.addProperty("count", ca + cb);
+		return out;
+	}
+
+	private static com.google.gson.JsonObject mergeLastSeenJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
+		// Keep the entry with the newer lastSeenMs as the base, but preserve max combatLevel.
+		long aSeen = getJsonLong(a, "lastSeenMs");
+		long bSeen = getJsonLong(b, "lastSeenMs");
+		com.google.gson.JsonObject latest = (bSeen >= aSeen) ? b : a;
+		com.google.gson.JsonObject out = new com.google.gson.JsonObject();
+		for (String k : latest.keySet()) {
+			out.add(k, latest.get(k).deepCopy());
+		}
+		long ca = a.has("combatLevel") ? getJsonLong(a, "combatLevel") : 0L;
+		long cb = b.has("combatLevel") ? getJsonLong(b, "combatLevel") : 0L;
+		if (Math.max(ca, cb) > 0) out.addProperty("combatLevel", Math.max(ca, cb));
+		out.addProperty("lastSeenMs", Math.max(aSeen, bSeen));
+		// playerName: prefer latest non-empty.
+		if (!latest.has("playerName") && a.has("playerName")) out.add("playerName", a.get("playerName").deepCopy());
+		return out;
 	}
 
 	private void removeDuplicateNamesFromAllLists() {
