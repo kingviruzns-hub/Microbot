@@ -12,16 +12,24 @@ import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Config {
     private static final Logger logger = Logger.getLogger(Config.class.getName());
+    private static final Properties properties = new Properties();
+
     private static final String DEFAULT_CONFIG_PATH;
     private static final String CONFIG_FILE_PATH;
     private static final String FILE_PATH;
-    private static final Properties properties = new Properties();
+
+    private static final Pattern BOT_TOKEN_PATTERN =
+            Pattern.compile("\"(?:BOT_TOKEN|botToken|bot_token)\"\\s*[:=]\\s*\"([^\"]*)\"", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CHANNEL_ID_PATTERN =
+            Pattern.compile("\"(?:CHANNEL_ID|channelId|channel_id)\"\\s*[:=]\\s*\"([^\"]*)\"", Pattern.CASE_INSENSITIVE);
 
     static {
-        String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot" + File.separator + "viruzosbot";
+        String basePath = new File(System.getProperty("user.home"), ".microbot/viruzosbot").getAbsolutePath();
         DEFAULT_CONFIG_PATH = basePath + File.separator + "viruzffabot.json";
         CONFIG_FILE_PATH = System.getProperty("microbot.config.path", DEFAULT_CONFIG_PATH);
         FILE_PATH = basePath + File.separator + "nslist.txt";
@@ -35,7 +43,7 @@ public class Config {
         try (FileInputStream fis = new FileInputStream(configFile)) {
             properties.load(fis);
         } catch (IOException e) {
-            logger.log(Level.SEVERE, "Failed to load config file", e);
+            logger.log(Level.WARNING, "Failed to load config file as properties: {0}", e.getMessage());
         }
     }
 
@@ -49,10 +57,6 @@ public class Config {
                 }
                 if (file.createNewFile()) {
                     logger.log(Level.INFO, "Created empty {0} at: {1}", new Object[]{"config file", file.getAbsolutePath()});
-
-                    if (file.getAbsolutePath().equals(new File(CONFIG_FILE_PATH).getAbsolutePath())) {
-                        save();
-                    }
                 }
             } catch (IOException e) {
                 logger.log(Level.SEVERE, "Failed to create " + "config file", e);
@@ -68,31 +72,66 @@ public class Config {
         }
     }
 
-    public static String getBotToken() {
+    private static String readConfigText() {
         try {
-            String json = Files.readString(Paths.get(DEFAULT_CONFIG_PATH), StandardCharsets.UTF_8);
-            JsonObject obj = new Gson().fromJson(json, JsonObject.class);
-            if (obj != null && obj.has("BOT_TOKEN")) {
-                return obj.get("BOT_TOKEN").getAsString();
-            }
+            File f = new File(CONFIG_FILE_PATH);
+            if (!f.exists()) return null;
+            return Files.readString(Paths.get(f.getAbsolutePath()), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to read BOT_TOKEN from config", e);
+            logger.log(Level.WARNING, "Failed to read config file", e);
+            return null;
         }
+    }
+
+    public static String getBotToken() {
+        String text = readConfigText();
+        if (text != null) {
+            try {
+                JsonObject obj = new Gson().fromJson(text, JsonObject.class);
+                if (obj != null && obj.has("BOT_TOKEN")) {
+                    return obj.get("BOT_TOKEN").getAsString();
+                }
+                if (obj != null && obj.has("botToken")) {
+                    return obj.get("botToken").getAsString();
+                }
+                if (obj != null && obj.has("bot_token")) {
+                    return obj.get("bot_token").getAsString();
+                }
+            } catch (Exception ignored) {
+            }
+            Matcher m = BOT_TOKEN_PATTERN.matcher(text);
+            if (m.find()) {
+                return m.group(1);
+            }
+        }
+        String v = properties.getProperty("BOT_TOKEN");
+        if (v != null && !v.trim().isEmpty()) return v.trim();
         return null;
     }
 
     public static String getChannelId() {
-        try {
-            String json = Files.readString(Paths.get(DEFAULT_CONFIG_PATH), StandardCharsets.UTF_8);
-            JsonObject obj = new Gson().fromJson(json, JsonObject.class);
-            if (obj != null) {
-                if (obj.has("CHANNEL_ID")) return obj.get("CHANNEL_ID").getAsString();
-                if (obj.has("channelId")) return obj.get("channelId").getAsString();
-                if (obj.has("channel_id")) return obj.get("channel_id").getAsString();
+        String text = readConfigText();
+        if (text != null) {
+            try {
+                JsonObject obj = new Gson().fromJson(text, JsonObject.class);
+                if (obj != null) {
+                    if (obj.has("CHANNEL_ID")) return obj.get("CHANNEL_ID").getAsString();
+                    if (obj.has("channelId")) return obj.get("channelId").getAsString();
+                    if (obj.has("channel_id")) return obj.get("channel_id").getAsString();
+                }
+            } catch (Exception ignored) {
             }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to read CHANNEL_ID from config", e);
+            Matcher m = CHANNEL_ID_PATTERN.matcher(text);
+            if (m.find()) {
+                return m.group(1);
+            }
         }
+        String v = properties.getProperty("CHANNEL_ID");
+        if (v != null && !v.trim().isEmpty()) return v.trim();
+        v = properties.getProperty("channelId");
+        if (v != null && !v.trim().isEmpty()) return v.trim();
+        v = properties.getProperty("channel_id");
+        if (v != null && !v.trim().isEmpty()) return v.trim();
         return null;
     }
 

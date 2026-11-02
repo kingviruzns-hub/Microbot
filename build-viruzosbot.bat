@@ -5,7 +5,7 @@ cd /d "%~dp0"
 rem Gradle 8.8 cannot run on Java 24, so prefer a JDK 17-21 install.
 set "JAVA_HOME="
 for %%D in (
-	"C:\Program Files\Java\jdk-21"
+	"C:\Program Files\Java\jdk-21.0.13.0.3"
 	"C:\Program Files\Java\jdk-17"
 	"C:\Program Files\Eclipse Adoptium\jdk-21*"
 	"C:\Program Files\Eclipse Adoptium\jdk-17*"

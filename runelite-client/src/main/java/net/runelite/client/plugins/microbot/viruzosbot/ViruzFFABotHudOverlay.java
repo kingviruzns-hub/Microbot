@@ -49,7 +49,7 @@ public class ViruzFFABotHudOverlay extends OverlayPanel
 			return bg;
 		}
 		bgTried = true;
-		try (InputStream in = ViruzFFABotHudOverlay.class.getResourceAsStream("viruzffabot.png"))
+		try (InputStream in = ViruzFFABotHudOverlay.class.getResourceAsStream("viruzosbot.png"))
 		{
 			if (in != null)
 			{
@@ -65,7 +65,7 @@ public class ViruzFFABotHudOverlay extends OverlayPanel
 		}
 		try
 		{
-			File f = new File(System.getProperty("user.home"), ".microbot/viruzosbot/viruzffabot.png");
+			File f = new File(System.getProperty("user.home"), ".microbot/viruzosbot/viruzosbot.png");
 			if (f.exists())
 			{
 				bg = ImageIO.read(f);
@@ -132,9 +132,14 @@ public class ViruzFFABotHudOverlay extends OverlayPanel
 					.right(runtime)
 					.build());
 
+			String locationText = "None selected";
+			if (config != null && config.location() != null)
+			{
+				locationText = config.location().getDisplayName();
+			}
 			panelComponent.getChildren().add(LineComponent.builder()
 					.left("Location")
-					.right(script.selectedLocation)
+					.right(locationText)
 					.build());
 
 			BufferedImage img = background();
