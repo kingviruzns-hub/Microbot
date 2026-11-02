@@ -1,5 +1,6 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.eventbus.Subscribe;
@@ -25,8 +26,11 @@ import javax.inject.Inject;
 )
 @Slf4j
 public class ViruzFFABotPlugin extends Plugin {
-	@Inject
+	@Getter
+    @Inject
 	private ViruzFFABotScript script;
+	@Inject
+	private ViruzBotControl botControl;
 	@Inject
 	private ViruzFFABotHudOverlay hudOverlay;
 	@Inject
@@ -39,16 +43,19 @@ public class ViruzFFABotPlugin extends Plugin {
 		return configManager.getConfig(ViruzFFABotConfig.class);
 	}
 
-	@Override
+    @Override
 	protected void startUp() throws Exception {
 		script.setConfig(config);
+		botControl.setScript(script);
 		overlayManager.add(hudOverlay);
 		script.run();
+		botControl.run();
 	}
 
 	@Override
 	protected void shutDown() throws Exception {
 		overlayManager.remove(hudOverlay);
+		if (botControl != null) botControl.shutdown();
 		script.shutdown();
 	}
 

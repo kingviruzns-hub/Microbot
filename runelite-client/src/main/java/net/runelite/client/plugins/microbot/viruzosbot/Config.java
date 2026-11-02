@@ -1,9 +1,14 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -61,6 +66,34 @@ public class Config {
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Failed to save config file", e);
         }
+    }
+
+    public static String getBotToken() {
+        try {
+            String json = Files.readString(Paths.get(DEFAULT_CONFIG_PATH), StandardCharsets.UTF_8);
+            JsonObject obj = new Gson().fromJson(json, JsonObject.class);
+            if (obj != null && obj.has("BOT_TOKEN")) {
+                return obj.get("BOT_TOKEN").getAsString();
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to read BOT_TOKEN from config", e);
+        }
+        return null;
+    }
+
+    public static String getChannelId() {
+        try {
+            String json = Files.readString(Paths.get(DEFAULT_CONFIG_PATH), StandardCharsets.UTF_8);
+            JsonObject obj = new Gson().fromJson(json, JsonObject.class);
+            if (obj != null) {
+                if (obj.has("CHANNEL_ID")) return obj.get("CHANNEL_ID").getAsString();
+                if (obj.has("channelId")) return obj.get("channelId").getAsString();
+                if (obj.has("channel_id")) return obj.get("channel_id").getAsString();
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to read CHANNEL_ID from config", e);
+        }
+        return null;
     }
 
     public static String getNsListFilePath() {
