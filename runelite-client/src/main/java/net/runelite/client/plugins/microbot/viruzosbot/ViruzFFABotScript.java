@@ -76,7 +76,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.4";
+	static final String VERSION = "1.0.5";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -283,6 +283,7 @@ public class ViruzFFABotScript extends Script
 	final PlayerStats playerStats = new PlayerStats();
 	private long nextNonTargetScanMs = 0L;
 	private long nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
+	private long nextMindRuneCheckMs = System.currentTimeMillis() + 10L * 60L * 1000L;
 	private long noValidTargetCooldownUntilMs = 0L;
 	private static final int MAX_SAFE_ZONE_RETURN_ATTEMPTS = 8;
 	private boolean safeZoneEscapeActive = false;
@@ -821,6 +822,7 @@ public class ViruzFFABotScript extends Script
 		this.sessionStartMs = System.currentTimeMillis();
 		this.nextAntiBanAtMs = System.currentTimeMillis() + Rs2Random.between(120000, 240000);
 		this.nextAttackListReloadAtMs = System.currentTimeMillis() + ATTACK_LIST_RELOAD_INTERVAL_MS;
+		this.nextMindRuneCheckMs = System.currentTimeMillis() + 10L * 60L * 1000L;
 		this.nextUltradianUpdateMs = System.currentTimeMillis() + Rs2Random.between(600000, 1200000);
 		lastSwitchLevelForCurrentStyle = Rs2Player.getRealSkillLevel(Skill.ATTACK);
 		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
@@ -945,6 +947,10 @@ public class ViruzFFABotScript extends Script
 			if (System.currentTimeMillis() >= nextTrackerInfoSaveMs) {
 				this.saveTrackerInfo();
 				nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
+			}
+			if (now >= nextMindRuneCheckMs) {
+				checkMindRunes();
+				nextMindRuneCheckMs = now + 10L * 60L * 1000L;
 			}
 			int delay = (int) Math.max(100, Rs2Random.between(250, 500) * (1.0 - aiAssistant.getPlayerProfiles().size() * 0.001));
 			delay = Math.min(delay, 600);
@@ -1971,6 +1977,19 @@ public class ViruzFFABotScript extends Script
 			return equippedCount == 1 && hasStaffOfAir;
 		} catch (Exception e) {
 			return false;
+		}
+	}
+
+	private void checkMindRunes() {
+		if (!Microbot.isLoggedIn()) return;
+		Rs2ItemModel weapon = Rs2Equipment.get(EquipmentInventorySlot.WEAPON);
+		if (weapon == null || weapon.getName() == null || !weapon.getName().equalsIgnoreCase(STAFF_OF_AIR)) {
+			return;
+		}
+		Rs2ItemModel mindRunes = Rs2Inventory.get("Mind rune", true);
+		int mindRuneCount = (mindRunes == null) ? 0 : mindRunes.getQuantity();
+		if (mindRuneCount < 1000) {
+			DiscordWebhook2.sendMessage("@Viruz, mind runes are running low");
 		}
 	}
 
