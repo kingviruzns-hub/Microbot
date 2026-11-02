@@ -4135,11 +4135,4 @@ public class ViruzFFABotScript extends Script
 		this.log("Manually reloaded nslist.txt: " + this.attackSet.size() + " names");
 	}
 
-	public int getTotalActions() {
-		return humanBehavior.getTotalActions();
-	}
-
-	public long getSessionDurationMinutes() {
-		return humanBehavior.getSessionDurationMinutes();
-	}
 }

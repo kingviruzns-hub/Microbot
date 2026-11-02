@@ -2,7 +2,6 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 
 import net.runelite.client.plugins.microbot.Microbot;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
-import net.runelite.client.plugins.microbot.viruzosbot.Config;
 import net.runelite.client.plugins.microbot.util.Global;
 import net.runelite.client.plugins.microbot.util.camera.Rs2Camera;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
@@ -10,7 +9,6 @@ import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import lombok.Getter;
 
 import java.awt.*;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,7 +27,6 @@ public class HumanBehavior {
     private static final long NATURAL_MOVE_INTERVAL_MS = 30000;
 
     private long sessionStartTime;
-    @Getter
     private int totalActions;
     @Getter
     private int currentFatigueLevel;
@@ -263,7 +260,7 @@ public class HumanBehavior {
             Path path = Paths.get(Config.getHumanBehaviorFilePath());
             if (!Files.exists(path)) return;
             String json = Files.readString(path);
-            if (json == null || json.trim().isEmpty()) return;
+            if (json.trim().isEmpty()) return;
             Gson gson = new Gson();
             java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<java.util.Map<String, Object>>(){}.getType();
             java.util.Map<String, Object> data = gson.fromJson(json, type);
@@ -276,10 +273,6 @@ public class HumanBehavior {
         } catch (Exception e) {
             System.out.println("HumanBehavior load error: " + e.getMessage());
         }
-    }
-
-    public long getSessionDurationMinutes() {
-        return (System.currentTimeMillis() - sessionStartTime) / 60000;
     }
 
     public enum ReactionContext {
