@@ -206,16 +206,6 @@ public class PlayerStats {
         return formatRuntime(total);
     }
 
-    public String getCurrentRuntimeString() {
-        long start = currentSessionStartMs > 0 ? currentSessionStartMs : sessionStartMs;
-        return formatRuntime(System.currentTimeMillis() - start);
-    }
-
-    public long getTotalXpEarned() {
-        updateXpEarned();
-        return totalXpEarned;
-    }
-
     public List<Map.Entry<String, Integer>> getTopBullied(int limit) {
         List<Map.Entry<String, Integer>> list = new ArrayList<>(bulliedAttacks.entrySet());
         list.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));

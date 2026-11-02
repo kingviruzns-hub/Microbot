@@ -118,22 +118,6 @@ public class AIAssistant {
     }
 
 
-    public void updateLastSeen(String playerName) {
-        recordSeenPlayer(playerName, -1);
-    }
-
-    public void updateLastSeen(String playerName, int combatLevel) {
-        recordSeenPlayer(playerName, combatLevel);
-    }
-
-    public void recordPlayerSeen(String playerName, int combatLevel) {
-        recordSeenPlayer(playerName, combatLevel);
-    }
-
-    public void observePlayer(String playerName, int combatLevel) {
-        recordSeenPlayer(playerName, combatLevel);
-    }
-
     public boolean isLikelyLureBot(String playerName) {
         if (playerName == null) return false;
         PlayerProfile profile = playerProfiles.get(playerName.toLowerCase(Locale.ROOT));
@@ -177,12 +161,11 @@ public class AIAssistant {
             profile = playerProfiles.computeIfAbsent(key, k -> new PlayerProfile());
             profile.combatLevel = getCombatLevel(candidate);
             profile.lastSeenAt = System.currentTimeMillis();
-            modelDirty = true;
         } else {
             int cb = getCombatLevel(candidate);
             if (cb > 0) profile.combatLevel = cb;
-            modelDirty = true;
         }
+        modelDirty = true;
         double score = DEFAULT_TARGET_SCORE;
         long timeSinceSeen = System.currentTimeMillis() - profile.lastSeenAt;
         profile.lastSeenAt = System.currentTimeMillis();
@@ -271,15 +254,6 @@ public class AIAssistant {
         long now = System.currentTimeMillis();
         if (now - lastMistakeAt < mistakeCooldown) return false;
         double chance = 0.01 + fatigueFactor * 0.003;
-        return ThreadLocalRandom.current().nextDouble() < chance;
-    }
-
-    public boolean shouldLeftClickInstead(boolean targetIsLowHp, double fatigueFactor) {
-        double safeFatigue = Math.max(0.0, fatigueFactor);
-        double chance = 0.15;
-        if (targetIsLowHp) chance += 0.15;
-        chance += safeFatigue * 0.005;
-        chance = Math.max(0.0, Math.min(1.0, chance));
         return ThreadLocalRandom.current().nextDouble() < chance;
     }
 
@@ -377,15 +351,6 @@ public class AIAssistant {
         return removed;
     }
 
-    public void clearQuitStatus(String playerName) {
-        if (playerName == null || playerName.isEmpty()) return;
-        String key = playerName.toLowerCase(Locale.ROOT).trim();
-        PlayerProfile profile = playerProfiles.get(key);
-        if (profile == null || profile.status == null || !profile.status.trim().toLowerCase(Locale.ROOT).startsWith("quit")) return;
-        profile.status = null;
-        modelDirty = true;
-        saveModel();
-    }
 
     public void onTick() {
         decayAnimationCooldowns();
@@ -638,14 +603,8 @@ public class AIAssistant {
         public double weWonRatio() {
             return encounterCount > 0 ? (double) timesWeWon / encounterCount : 0;
         }
-        public double fightBackRatio() {
-            return encounterCount > 0 ? (double) timesFoughtBack / encounterCount : 0;
-        }
         public double hitAndRunRatio() {
             return timesAttackedUs > 0 ? (double) timesHitAndRan / timesAttackedUs : 0;
-        }
-        public double threatDisplay() {
-            return threatScore;
         }
     }
 
