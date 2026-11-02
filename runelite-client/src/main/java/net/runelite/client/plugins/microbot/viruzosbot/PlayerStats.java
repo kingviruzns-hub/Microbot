@@ -222,24 +222,6 @@ public class PlayerStats {
         return list.subList(0, Math.min(limit, list.size()));
     }
 
-    public String generateStatusSummary() {
-        updateXpEarned();
-        long total = totalRuntimeMs.get() + (System.currentTimeMillis() - sessionStartMs);
-        StringBuilder sb = new StringBuilder();
-        sb.append("Runtime: ").append(formatRuntime(total));
-        sb.append(" | XP Earned: ").append(totalXpEarned);
-        if (!bulliedAttacks.isEmpty()) {
-            sb.append(" | Most Bullied: ");
-            int i = 0;
-            for (Map.Entry<String, Integer> e : bulliedAttacks.entrySet()) {
-                if (i++ > 0) sb.append(", ");
-                sb.append(e.getKey()).append("(").append(e.getValue()).append(")");
-                if (i >= 3) break;
-            }
-        }
-        return sb.toString();
-    }
-
     private void trimBullied() {
         while (bulliedAttacks.size() > MAX_BULLIED) {
             String lowestKey = null;

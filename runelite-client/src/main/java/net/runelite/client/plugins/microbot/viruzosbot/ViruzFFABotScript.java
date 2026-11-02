@@ -268,11 +268,7 @@ public class ViruzFFABotScript extends Script
 	private static final long MIN_ATTACK_ATTEMPT_INTERVAL_MS = 600L;
 	private static final long SAME_TARGET_COOLDOWN_MS = 1200L;
 	private static final long TARGET_SKIP_COOLDOWN_MS = 5L * 60L * 1000L;
-	private static final long LOCATION_SWITCH_IDLE_MS = 60L * 120L * 2000L;
-	private static final List<String> AUTO_SWITCH_LOCATIONS = Arrays.asList("Portal", "Middle", "Hills single", "Hills");
 	private final Map<String, Long> targetCooldownUntilMs = new HashMap<>();
-	private long lastCombatActivityMs = System.currentTimeMillis();
-	private long lastAutoLocationSwitchMs = 0L;
 	private long sessionStartMs = System.currentTimeMillis();
 	private long forcedBreakUntilMs = 0L;
 	private long lastForcedBreakMs = 0L;
@@ -521,19 +517,6 @@ public class ViruzFFABotScript extends Script
 			log.info("Loaded {} names from luredrag.txt.", lureDragSet.size());
 		} catch (IOException e) {
 			log.info("Error loading luredrag.txt: {}", e.getMessage());
-		}
-	}
-
-	private void removeNameFromList(String name) {
-		final String lowerName = name.toLowerCase(Locale.ROOT).trim();
-		if (lowerName.isEmpty()) return;
-		if (this.attackSet.remove(lowerName)) {
-			this.targets.remove(lowerName);
-			saveListToFile();
-			log.info("Removed {} from nslist.txt", name);
-			sendDiscordEmbed("🗑️ Removed **" + name + "** from nslist.txt");
-		} else {
-			log.info("Name not found in list: {}", name);
 		}
 	}
 
@@ -1189,7 +1172,6 @@ public class ViruzFFABotScript extends Script
 			}
 		} else {
 			lastInCombatMs = System.currentTimeMillis();
-			lastCombatActivityMs = System.currentTimeMillis();
 			postCombatPauseUntilMs = 0L;
 		}
 		if (this.isAttackEnabled()) {
@@ -1683,7 +1665,6 @@ public class ViruzFFABotScript extends Script
 				this.status = "Approached target";
 			}
 			lastAttackAttemptAtMs = now;
-			lastCombatActivityMs = now;
 			lastAttackTargetName = targetName.isEmpty() ? null : targetName;
 			lastSameTargetAttemptAtMs = now;
 
@@ -2176,7 +2157,6 @@ public class ViruzFFABotScript extends Script
 		if (retaliated) {
 			this.lastAttackAttemptAtMs = System.currentTimeMillis();
 			this.lastSameTargetAttemptAtMs = this.lastAttackAttemptAtMs;
-			this.lastCombatActivityMs = this.lastAttackAttemptAtMs;
 			this.lastAttackTargetName = targetKey;
 		}
 		return !retaliated;
@@ -2850,16 +2830,7 @@ public class ViruzFFABotScript extends Script
 
 
 
-	private int ArrayIndexSkillOffset(Skill skill) {
-		switch (skill) {
-			case ATTACK: return 0;
-			case STRENGTH: return 1;
-			case DEFENCE: return 2;
-			case HITPOINTS: return 3;
-			case RANGED: return 4;
-			default: return 5;
-		}
-	}
+
 
 
 
@@ -3939,17 +3910,7 @@ public class ViruzFFABotScript extends Script
 		return new Point(b.x + b.width / 2, b.y + b.height / 2);
 	}
 
-	private Point getClickablePointForObject(net.runelite.api.TileObject obj) {
-		if (obj == null) return null;
-		java.awt.Shape poly = Microbot.getClientThread().runOnClientThreadOptional(() -> tileObjectCanvasTilePoly(obj)).orElse(null);
-		if (poly == null) return null;
-		Rectangle b = poly.getBounds();
-		return new Point(b.x + b.width / 2, b.y + b.height / 2);
-	}
 
-	private static java.awt.Shape tileObjectCanvasTilePoly(net.runelite.api.TileObject obj) {
-		return obj.getCanvasTilePoly();
-	}
 
 	private static Stream<Rs2PlayerModel> getPlayers(Predicate<Rs2PlayerModel> predicate) {
 		final Player localPlayer = Microbot.getClient().getLocalPlayer();
