@@ -900,7 +900,6 @@ public class ViruzFFABotScript extends Script
 				this.nextAttackListReloadAtMs = now + ATTACK_LIST_RELOAD_INTERVAL_MS;
 			}
 			this.trackRepeatAttackerAutoNsList(localPlayer, now);
-			this.maybeAutoSwitchLocation();
 			if (now >= this.nextActionTime) {
 				this.setNextPreventLogout();
 			}
@@ -2961,27 +2960,6 @@ public class ViruzFFABotScript extends Script
 			default:
 				this.sleepWithFatigue((int) (300 * (1.0 + fatigueF * 0.04)), (int) (1000 * (1.0 + fatigueF * 0.04)));
 		}
-	}
-
-	private void maybeAutoSwitchLocation() {
-		if (!this.attackEnabled || this.currentArea == null || this.selectedLocation == null) return;
-		long now = System.currentTimeMillis();
-		if (now - this.lastCombatActivityMs <= LOCATION_SWITCH_IDLE_MS) return;
-		if (now - this.lastAutoLocationSwitchMs < LOCATION_SWITCH_IDLE_MS) return;
-		List<String> candidates = new ArrayList<>();
-		for (String loc : AUTO_SWITCH_LOCATIONS) {
-			if (!loc.equals(this.selectedLocation)) {
-				candidates.add(loc);
-			}
-		}
-		if (candidates.isEmpty()) return;
-		String newLocation = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
-		this.lastAutoLocationSwitchMs = now;
-		this.selectedLocation = newLocation;
-		this.currentArea = this.areaMap.get(newLocation);
-		this.status = "Auto-switching location to " + newLocation;
-		this.log(this.status);
-		sendDiscordEmbed("Auto-switching location to **" + newLocation + "** (No opps since 1hr)");
 	}
 
 	private void runTrackerScans() {

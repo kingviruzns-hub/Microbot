@@ -3,7 +3,6 @@ package net.runelite.client.plugins.microbot.viruzosbot;
 import java.awt.*;
 
 import net.runelite.client.plugins.microbot.viruzosbot.Config;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -139,7 +138,7 @@ public class SessionTracker {
             Path path = Paths.get(Config.getSessionFilePath());
             if (!Files.exists(path)) return;
             String json = Files.readString(path);
-            if (json == null || json.trim().isEmpty()) return;
+            if (json.trim().isEmpty()) return;
             Gson gson = new Gson();
             java.lang.reflect.Type type = new com.google.gson.reflect.TypeToken<java.util.Map<String, Object>>(){}.getType();
             java.util.Map<String, Object> data = gson.fromJson(json, type);
