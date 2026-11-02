@@ -16,7 +16,7 @@ public class Config {
     private static final Properties properties = new Properties();
 
     static {
-        String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot";
+        String basePath = "C:" + File.separator + "Users" + File.separator + "4Twen" + File.separator + ".microbot" + File.separator + "viruzosbot";
         DEFAULT_CONFIG_PATH = basePath + File.separator + "config.properties";
         CONFIG_FILE_PATH = System.getProperty("microbot.config.path", DEFAULT_CONFIG_PATH);
         FILE_PATH = basePath + File.separator + "nslist.txt";
