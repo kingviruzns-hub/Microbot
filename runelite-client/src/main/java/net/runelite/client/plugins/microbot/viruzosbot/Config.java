@@ -89,24 +89,39 @@ public class Config {
             try {
                 JsonObject obj = new Gson().fromJson(text, JsonObject.class);
                 if (obj != null && obj.has("BOT_TOKEN")) {
-                    return obj.get("BOT_TOKEN").getAsString();
+                    return normalizeToken(obj.get("BOT_TOKEN").getAsString());
                 }
                 if (obj != null && obj.has("botToken")) {
-                    return obj.get("botToken").getAsString();
+                    return normalizeToken(obj.get("botToken").getAsString());
                 }
                 if (obj != null && obj.has("bot_token")) {
-                    return obj.get("bot_token").getAsString();
+                    return normalizeToken(obj.get("bot_token").getAsString());
                 }
             } catch (Exception ignored) {
             }
             Matcher m = BOT_TOKEN_PATTERN.matcher(text);
             if (m.find()) {
-                return m.group(1);
+                return normalizeToken(m.group(1));
             }
         }
         String v = properties.getProperty("BOT_TOKEN");
-        if (v != null && !v.trim().isEmpty()) return v.trim();
+        if (v != null && !v.trim().isEmpty()) return normalizeToken(v);
         return null;
+    }
+
+    private static String normalizeToken(String token) {
+        if (token == null) return null;
+        String t = token.trim();
+        String lower = t.toLowerCase(java.util.Locale.ROOT);
+        if (lower.startsWith("bot ")) t = t.substring(4).trim();
+        else if (lower.startsWith("bearer ")) t = t.substring(7).trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String trimOrNull(String value) {
+        if (value == null) return null;
+        String v = value.trim();
+        return v.isEmpty() ? null : v;
     }
 
     public static String getChannelId() {
@@ -115,15 +130,15 @@ public class Config {
             try {
                 JsonObject obj = new Gson().fromJson(text, JsonObject.class);
                 if (obj != null) {
-                    if (obj.has("CHANNEL_ID")) return obj.get("CHANNEL_ID").getAsString();
-                    if (obj.has("channelId")) return obj.get("channelId").getAsString();
-                    if (obj.has("channel_id")) return obj.get("channel_id").getAsString();
+                    if (obj.has("CHANNEL_ID")) return trimOrNull(obj.get("CHANNEL_ID").getAsString());
+                    if (obj.has("channelId")) return trimOrNull(obj.get("channelId").getAsString());
+                    if (obj.has("channel_id")) return trimOrNull(obj.get("channel_id").getAsString());
                 }
             } catch (Exception ignored) {
             }
             Matcher m = CHANNEL_ID_PATTERN.matcher(text);
             if (m.find()) {
-                return m.group(1);
+                return trimOrNull(m.group(1));
             }
         }
         String v = properties.getProperty("CHANNEL_ID");
