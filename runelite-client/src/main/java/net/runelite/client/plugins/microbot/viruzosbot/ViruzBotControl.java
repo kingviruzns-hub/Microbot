@@ -285,6 +285,8 @@ public class ViruzBotControl extends Script {
         for (Map.Entry<String, JsonElement> e : stats.entrySet()) {
             if (e.getValue() == null || !e.getValue().isJsonPrimitive()) continue;
             if ("Most Bullied".equalsIgnoreCase(e.getKey())) continue;
+            // Internal raw-millisecond value; the formatted fields are shown instead.
+            if ("RuntimeMs".equalsIgnoreCase(e.getKey())) continue;
             JsonObject field = new JsonObject();
             field.addProperty("name", "✨ " + e.getKey());
             field.addProperty("value", "```" + e.getValue().getAsString() + "```");

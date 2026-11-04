@@ -76,7 +76,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.5";
+	static final String VERSION = "1.0.6";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -793,6 +793,8 @@ public class ViruzFFABotScript extends Script
 		initializeAreaMap();
 		this.currentArea = this.areaMap.get(this.selectedLocation);
 		removeBlockedNamesFromFile(this.filePath);
+		// Load the previous totals from stats.json before the first save of this session.
+		playerStats.startSession();
 		this.saveTrackerInfo();
 		removeDuplicateNamesFromAllLists();
 		setNextPreventLogout();
@@ -801,7 +803,6 @@ public class ViruzFFABotScript extends Script
 		loadBluePhatSet();
 		loadLureDragSet();
 		ensureAutoRetaliateOff();
-		playerStats.startSession();
 		this.sessionStartMs = System.currentTimeMillis();
 		this.nextAntiBanAtMs = System.currentTimeMillis() + Rs2Random.between(120000, 240000);
 		this.nextAttackListReloadAtMs = System.currentTimeMillis() + ATTACK_LIST_RELOAD_INTERVAL_MS;
