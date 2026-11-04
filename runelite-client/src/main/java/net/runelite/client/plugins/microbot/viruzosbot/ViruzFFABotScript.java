@@ -70,13 +70,22 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.inject.Singleton;
+
 import static java.nio.file.Paths.get;
 
 
+/**
+ * Singleton so the plugin, HUD overlay and control surface all observe the same
+ * instance. Without this, Guice creates a separate script per injection site, so
+ * the overlay renders a never-started instance (status stuck on "Paused",
+ * PlayerStats never initialized) while the real loop runs on the plugin's copy.
+ */
+@Singleton
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.6";
+	static final String VERSION = "1.0.7";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -161,6 +170,8 @@ public class ViruzFFABotScript extends Script
 	private static final int DRAG_STEP_SLEEP_MAX_MS = 350;
 	private static final int DRAG_MAX_STEPS = 300;
 	private static final int DRAG_MAX_REENGAGE_ATTEMPTS = 5;
+	private static final int OBSTACLE_AVOID_RADIUS = 2;
+	private static final long OBSTACLE_AVOID_COOLDOWN_MS = 60_000L;
 	@Getter
 	@Setter
 	private boolean attackEnabled = true;
@@ -656,6 +667,7 @@ public class ViruzFFABotScript extends Script
 	private long lastInCombatMs = 0L;
 	private boolean wasInFfaArea = false;
 	private long postCombatPauseUntilMs = 0L;
+	private long nextObstacleAvoidMs = 0L;
 
 	@Override
 	public boolean run() {
@@ -3412,20 +3424,40 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void avoidObstacles() {
+		final long now = System.currentTimeMillis();
+		if (now < nextObstacleAvoidMs) return;
+
+		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+		if (localPlayer == null) return;
+		WorldPoint lt = localPlayer.getWorldLocation();
+		if (lt == null) return;
+
+		// Standing inside the selected combat area is exactly where we want to be.
+		// Nudging away from a nearby obstacle there made the bot pace between random
+		// tiles forever (e.g. at Hills, where a climbable object is inside the area).
+		if (this.currentArea != null && this.currentArea.contains(lt)) return;
+		if (isPlayerInCombat(localPlayer)) return;
+
 		Rs2TileObjectModel obstacle = Microbot.getRs2TileObjectCache().query()
 				.where(o -> o.getTileObjectType() == TileObjectType.GAME)
 				.where(o -> tileObjectHasAction(o, "Climb-up") || tileObjectHasAction(o, "Climb-down"))
-				.within(8)
+				.within(OBSTACLE_AVOID_RADIUS)
 				.firstOnClientThread();
-		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
-		if (obstacle == null || localPlayer == null) return;
-		WorldPoint lt = localPlayer.getWorldLocation();
+		if (obstacle == null) return;
 		WorldPoint ot = obstacle.getWorldLocation();
-		if (lt != null && lt.distanceTo(ot) < 8) {
-			this.log("Avoiding climbing obstacle");
-			Rs2Walker.walkTo(lt.dx(Rs2Random.between(-2, 2)).dy(Rs2Random.between(-2, 2)));
-			Global.sleep(Rs2Random.between(2000, 3000));
+		if (lt.distanceTo(ot) > OBSTACLE_AVOID_RADIUS) return;
+
+		nextObstacleAvoidMs = now + OBSTACLE_AVOID_COOLDOWN_MS;
+		this.log("Avoiding climbing obstacle");
+		int dx = Integer.compare(lt.getX(), ot.getX());
+		int dy = Integer.compare(lt.getY(), ot.getY());
+		if (dx == 0 && dy == 0) {
+			dx = Rs2Random.between(-1, 1);
+			dy = Rs2Random.between(-1, 1);
+			if (dx == 0 && dy == 0) dx = 1;
 		}
+		Rs2Walker.walkTo(lt.dx(dx * 2).dy(dy * 2), 1);
+		Global.sleep(Rs2Random.between(800, 1500));
 	}
 
 	private void scanNonTargets(Rs2PlayerModel localPlayer) {
