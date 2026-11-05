@@ -170,6 +170,10 @@ public class Config {
         return FILE_PATH.replace("nslist.txt", "last_seen.json");
     }
 
+    public static String getMiaTargetsFilePath() {
+        return FILE_PATH.replace("nslist.txt", "mia_targets.json");
+    }
+
     public static String getStatsFilePath() {
         return FILE_PATH.replace("nslist.txt", "stats.json");
     }

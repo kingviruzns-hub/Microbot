@@ -85,7 +85,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.7";
+	static final String VERSION = "1.0.8";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -287,8 +287,11 @@ public class ViruzFFABotScript extends Script
 	final AIAssistant aiAssistant = new AIAssistant();
 	final SessionTracker sessionTracker = new SessionTracker();
 	final NonTargetTracker nonTargetTracker = new NonTargetTracker();
+	final MiaTracker miaTracker = new MiaTracker();
 	final PlayerStats playerStats = new PlayerStats();
 	private long nextNonTargetScanMs = 0L;
+	private long nextMiaCheckMs = 0L;
+	private static final long MIA_CHECK_INTERVAL_MS = 10_000L;
 	private long nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
 	private long nextMindRuneCheckMs = System.currentTimeMillis() + 10L * 60L * 1000L;
 	private long noValidTargetCooldownUntilMs = 0L;
@@ -790,6 +793,7 @@ public class ViruzFFABotScript extends Script
 			}
 			aiAssistant.saveTrackerInfo();
 			nonTargetTracker.saveTrackerInfo();
+			miaTracker.saveTrackerInfo();
 			playerStats.saveTrackerInfo();
 			sessionTracker.saveTrackerInfo();
 			humanBehavior.saveTrackerInfo();
@@ -935,6 +939,11 @@ public class ViruzFFABotScript extends Script
 				nextNonTargetScanMs = now + sessionTracker.getRecommendedScanInterval(scanFatigue);
 			}
 			nonTargetTracker.tickSave();
+			if (now >= nextMiaCheckMs) {
+				this.checkMiaTargets(now);
+				nextMiaCheckMs = now + MIA_CHECK_INTERVAL_MS;
+			}
+			miaTracker.tickSave();
 			if (playerStats.shouldPeriodicSave()) {
 				playerStats.saveTrackerInfo();
 			}
@@ -1747,6 +1756,7 @@ public class ViruzFFABotScript extends Script
 				recordTargetCooldown(target.getName());
 				sessionTracker.recordAttack();
 				playerStats.recordAttack(target.getName());
+				recordMiaEngagement(target.getName(), target, localPlayer, System.currentTimeMillis());
 				int timeout = Rs2Random.between(1200, 3000);
 				for (int elapsed = 0; !isPlayerInCombat(localPlayer) && elapsed < timeout; elapsed += Rs2Random.between(50, 150)) {
 					this.sleepWithFatigue(20, 50);
@@ -1836,6 +1846,7 @@ public class ViruzFFABotScript extends Script
 		if (!localName.isEmpty() && attackerKey.equals(localName)) {
 			return;
 		}
+		recordMiaEngagement(attackerName, attacker, localPlayer, now);
 		int animation = getAnimationOf(attacker);
 		boolean isAttackAnimation =
 				this.isMeleeAttack(animation) || this.isRangeAttack(animation) || this.isMagicAttack(animation);
@@ -2954,7 +2965,7 @@ public class ViruzFFABotScript extends Script
 
 		try {
 			WorldArea[] scanAreas = {this.AT_LOBBY, this.SAFE_ZONE, this.areaMap.get("Portal"), this.areaMap.get("Middle"), this.areaMap.get("Hills")};
-			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle"};
+			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle", "Hills"};
 
 			for (int i = 0; i < scanAreas.length; i++) {
 				WorldArea destArea = scanAreas[i];
@@ -2988,7 +2999,9 @@ public class ViruzFFABotScript extends Script
 					this.log("Trackers Scan: performing full tracker scan/save at " + areaName);
 					sessionTracker.recordScan();
 					sessionTracker.tickSave();
+					this.scanNonTargets(localPlayer);
 					nonTargetTracker.tickSave();
+					miaTracker.tickSave();
 					playerStats.save();
 					this.sleepWithFatigue(500, 1500);
 					this.log("Trackers Scan: " + areaName + " scan complete");
@@ -3464,6 +3477,7 @@ public class ViruzFFABotScript extends Script
 		if (localPlayer == null || localPlayer.getName() == null) return;
 		String localName = localPlayer.getName().toLowerCase(Locale.ROOT).trim();
 		String location = getLocationContext(localPlayer);
+		long now = System.currentTimeMillis();
 		List<Rs2PlayerModel> allPlayers = getPlayers(p -> p != null && p.getName() != null)
 				.collect(Collectors.toList());
 		for (Rs2PlayerModel p : allPlayers) {
@@ -3473,6 +3487,9 @@ public class ViruzFFABotScript extends Script
 			if (name.equals(localName)) continue;
 			nonTargetTracker.record(p, location);
 			aiAssistant.trackPlayer(playerName, p.getCombatLevel());
+			if (this.attackSet.contains(name)) {
+				miaTracker.recordSighting(playerName, location, now);
+			}
 		}
 	}
 
@@ -3495,6 +3512,37 @@ public class ViruzFFABotScript extends Script
 			return "FFA";
 		}
 		return "Unknown";
+	}
+
+	private void recordMiaEngagement(String playerName, Rs2PlayerModel target, Rs2PlayerModel localPlayer, long now) {
+		if (playerName == null || target == null || localPlayer == null) return;
+		String key = playerName.toLowerCase(Locale.ROOT).trim();
+		if (key.isEmpty() || !this.attackSet.contains(key)) return;
+		miaTracker.recordEngagement(playerName, getLocationContext(target), getLocationContext(localPlayer), now);
+	}
+
+	private void checkMiaTargets(long now) {
+		List<MiaTracker.MiaAlert> alerts = miaTracker.collectDueAlerts(now, this.attackSet);
+		for (MiaTracker.MiaAlert alert : alerts) {
+			String message = "@SO, " + alert.getName() + " has been MIA for more than 25 minutes.";
+			String lastSeen = formatMiaLastSeen(alert.getLastSeenMs());
+			try {
+				DiscordWebhook.sendMiaAlert(alert.getName(), lastSeen, alert.getLocation(), message);
+			} catch (Exception e) {
+				log.info("Failed to send MIA alert: {}", e.getMessage());
+			}
+			this.log("MIA: " + alert.getName() + " last seen " + lastSeen + " at " + alert.getLocation());
+			this.status = "MIA: " + alert.getName();
+		}
+	}
+
+	private static String formatMiaLastSeen(long lastSeenMs) {
+		if (lastSeenMs <= 0L) return "Unknown";
+		long minutes = Math.max(0L, (System.currentTimeMillis() - lastSeenMs) / 60000L);
+		String absolute = java.time.Instant.ofEpochMilli(lastSeenMs)
+				.atZone(java.time.ZoneId.systemDefault())
+				.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+		return absolute + " (" + minutes + "m ago)";
 	}
 
 	private List<String> readLines(Path path) throws IOException {
@@ -4056,6 +4104,7 @@ public class ViruzFFABotScript extends Script
 		Player attacker = getCharacterInteractingWithMe();
 		if (!playerExists(attacker) || attacker.getName() == null) return;
 		String attackerKey = attacker.getName().toLowerCase(Locale.ROOT).trim();
+		recordMiaEngagement(attacker.getName(), new Rs2PlayerModel(attacker), localPlayer, System.currentTimeMillis());
 
 		WorldPoint localTile = localPlayer.getWorldLocation();
 		boolean isInSafeZone = localTile != null && this.SAFE_ZONE.contains(localTile);

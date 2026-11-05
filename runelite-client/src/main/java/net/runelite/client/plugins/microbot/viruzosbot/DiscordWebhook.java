@@ -50,6 +50,33 @@ public class DiscordWebhook {
         sendPayload(jsonPayload);
     }
 
+    public static void sendMiaAlert(String targetName, String lastSeen, String location, String message) {
+        String jsonPayload = "{"
+                + "\"content\": \"" + escapeJson(message) + "\","
+                + "\"embeds\": [{"
+                + "\"title\": \"🚨 Target MIA\","
+                + "\"color\": 15158332,"
+                + "\"fields\": ["
+                + "{\"name\": \"🎯 Target\", \"value\": \"```ansi\\n" + escapeJson(targetName) + "```\", \"inline\": true},"
+                + "{\"name\": \"🕒 Last Seen\", \"value\": \"```ansi\\n" + escapeJson(lastSeen) + "```\", \"inline\": true},"
+                + "{\"name\": \"📍 Location\", \"value\": \"```ansi\\n" + escapeJson(location) + "```\", \"inline\": true},"
+                + "{\"name\": \"📢 Message\", \"value\": \"" + escapeJson(message) + "\", \"inline\": false}"
+                + "],"
+                + "\"footer\": {\"text\": \"ViruzFFABot • Powered by Viruz Scripts\"},"
+                + "\"timestamp\": \"" + java.time.Instant.now().toString() + "\""
+                + "}]"
+                + "}";
+        sendPayload(jsonPayload);
+    }
+
+    private static String escapeJson(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
+    }
+
     private static int getSidebarColor(String event) {
         int sidebarColor = 5814783;
         String lowerEvent = event.toLowerCase();
