@@ -22,6 +22,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -336,7 +339,8 @@ public class ViruzBotControl extends Script {
 
         String displayName = entry.has("name") ? entry.get("name").getAsString() : name;
         long lastSeenMs = entry.has("lastSeenMs") ? entry.get("lastSeenMs").getAsLong() : 0L;
-        String formatted = formatDuration(Math.max(0L, System.currentTimeMillis() - lastSeenMs));
+        String formatted = formatLastSeen(lastSeenMs);
+        String since = formatDuration(Math.max(0L, System.currentTimeMillis() - lastSeenMs));
 
         JsonObject embed = new JsonObject();
         embed.addProperty("title", "👁️ Last Seen");
@@ -382,7 +386,7 @@ public class ViruzBotControl extends Script {
         embed.add("fields", fields);
 
         JsonObject footer = new JsonObject();
-        footer.addProperty("text", "dd:hh:mm:ss since last seen");
+        footer.addProperty("text", since + " since last seen");
         embed.add("footer", footer);
 
         sendEmbedObject(embed);
@@ -639,5 +643,19 @@ public class ViruzBotControl extends Script {
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
         return String.format(Locale.ROOT, "%02d:%02d:%02d:%02d", days, hours, minutes, seconds);
+    }
+
+    private static String formatLastSeen(long ms) {
+        if (ms <= 0L) return "Unknown";
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime zdt = Instant.ofEpochMilli(ms).atZone(zone);
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("h:mma", Locale.US);
+        String time = zdt.format(timeFmt).toLowerCase(Locale.US);
+        if (zdt.toLocalDate().equals(now.toLocalDate())) {
+            return "Today at " + time;
+        }
+        DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("M/d/yyyy", Locale.US);
+        return dateFmt.format(zdt) + " at " + time;
     }
 }
