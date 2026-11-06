@@ -3524,7 +3524,7 @@ public class ViruzFFABotScript extends Script
 	private void checkMiaTargets(long now) {
 		List<MiaTracker.MiaAlert> alerts = miaTracker.collectDueAlerts(now, this.attackSet);
 		for (MiaTracker.MiaAlert alert : alerts) {
-			String message = "@SO, " + alert.getName() + " has been MIA for more than 25 minutes.";
+			String message = alert.getName() + " has been MIA for more than 25 minutes.";
 			String lastSeen = formatMiaLastSeen(alert.getLastSeenMs());
 			try {
 				DiscordWebhook.sendMiaAlert(alert.getName(), lastSeen, alert.getLocation(), message);

@@ -26,7 +26,7 @@ if errorlevel 1 (
 	exit /b 1
 )
 
-set "DEST=%USERPROFILE%\.runelite\microbot-plugins"
+set "DEST=%USERPROFILE%\Downloads\microbot-plugins"
 if not exist "%DEST%" mkdir "%DEST%"
 copy /Y "runelite-client\build\libs\viruzosbot.jar" "%DEST%\viruzosbot.jar" >nul
 if errorlevel 1 (

@@ -30,7 +30,7 @@ public class MiaTracker {
     private static final long SAVE_INTERVAL_MS = 10_000L;
     private static final long STALE_ENTRY_MS = 7L * 24L * 60L * 60L * 1000L;
     private static final Set<String> MONITORED_LOCATIONS =
-            Set.of("lobby", "safe zone", "safezone", "portal", "middle");
+            Set.of("lobby", "safe zone", "safezone", "portal", "middle", "hills");
 
     private final Map<String, TrackedTarget> targets = new ConcurrentHashMap<>();
     private final String filePath;
