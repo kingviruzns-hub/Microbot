@@ -85,14 +85,19 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.8";
+	static final String VERSION = "1.0.10";
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
 		RuneLiteDebug.main(args);
 	}
 
-    private void applyConfig() {
+    /**
+     * Re-reads the current plugin configuration. Safe to call while the script is
+     * running, so config changes take effect without restarting the plugin.
+     * Startup-only player list imports are skipped here; see {@link #applyStartupLists()}.
+     */
+    public void applyConfig() {
 		if (config == null) return;
 		this.selectedLocation = config.location() != null ? config.location().getDisplayName() : "None selected";
 		this.attackEnabled = config.attack();
@@ -112,6 +117,8 @@ public class ViruzFFABotScript extends Script
 		}
 		this.hillScanEnabled = config.scanHills();
 
+		refreshSelectedArea();
+
 		focusPlayerNames.clear();
 		String focus = config.focusPlayers();
 		if (focus != null && !focus.trim().isEmpty()) {
@@ -123,7 +130,15 @@ public class ViruzFFABotScript extends Script
 			}
 		}
 		this.focusPlayersEnabled = !focusPlayerNames.isEmpty();
+	}
 
+	/**
+	 * Applies the one-shot player list actions (unlist/whitelist) from the config.
+	 * These mutate persisted lists, so they must only run when a session starts,
+	 * not on every config change.
+	 */
+	private void applyStartupLists() {
+		if (config == null) return;
 		String unlist = config.unlist();
 		if (unlist != null && !unlist.trim().isEmpty()) {
 			unlistNames(unlist);
@@ -132,6 +147,11 @@ public class ViruzFFABotScript extends Script
 		if (whitelist != null && !whitelist.trim().isEmpty()) {
 			whitelistNames(whitelist);
 		}
+	}
+
+	private void refreshSelectedArea() {
+		if (areaMap.isEmpty()) return;
+		this.currentArea = this.areaMap.get(this.selectedLocation);
 	}
 	private static final int REPORT_WIDGET_PARENT = 875;
 	private static final int REASON_PARENT_CHILD_INDEX = 19;
@@ -805,6 +825,7 @@ public class ViruzFFABotScript extends Script
 	private void startSession() {
 		Config.load();
 		applyConfig();
+		applyStartupLists();
 		this.timer2 = new Timer();
 		initializeAreaMap();
 		this.currentArea = this.areaMap.get(this.selectedLocation);

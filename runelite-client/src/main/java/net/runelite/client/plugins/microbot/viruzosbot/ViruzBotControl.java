@@ -306,7 +306,7 @@ public class ViruzBotControl extends Script {
                 String n = o.has("name") ? o.get("name").getAsString() : "?";
                 int attacks = o.has("attacks") ? o.get("attacks").getAsInt() : 0;
                 sb.append(String.format(Locale.ROOT, "%2d. %-20s  %d attacks%n", rank++, n, attacks));
-                if (rank > 11) break;
+                if (rank > 21) break;
             }
             JsonObject field = new JsonObject();
             field.addProperty("name", "🥊 Most Bullied");

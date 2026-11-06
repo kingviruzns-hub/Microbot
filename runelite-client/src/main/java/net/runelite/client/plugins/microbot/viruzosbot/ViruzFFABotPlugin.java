@@ -73,10 +73,15 @@ public class ViruzFFABotPlugin extends Plugin {
 		String key = event.getKey();
 		if ("resetFatigue".equals(key)) {
 			script.resetFatigue();
-		} else if ("reloadNsList".equals(key)) {
-			script.reloadNsList();
-		} else if ("dragMode".equals(key)) {
-			script.setDragModeEnabled(Boolean.parseBoolean(event.getNewValue()));
+			return;
 		}
+		if ("reloadNsList".equals(key)) {
+			script.reloadNsList();
+			return;
+		}
+
+		// Re-read every setting so toggle/location/list changes apply immediately
+		// instead of only after the plugin is restarted.
+		script.applyConfig();
 	}
 }

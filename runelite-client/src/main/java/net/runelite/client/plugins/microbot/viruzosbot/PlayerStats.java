@@ -15,7 +15,7 @@ import net.runelite.client.plugins.microbot.Microbot;
 import org.jetbrains.annotations.NotNull;
 
 public class PlayerStats {
-    private static final int MAX_BULLIED = 10;
+    private static final int MAX_BULLIED = 20;
     private static final long SAVE_INTERVAL_MS = 5_000L;
 
     // Total runtime persisted to stats.json as of lastPersistMs.
@@ -127,7 +127,8 @@ public class PlayerStats {
         }
         long newTotalRuntimeMs = baseRuntimeMs + deltaMs;
 
-        LinkedHashMap<String, Integer> mergedBullied = mergedBulliedAttacks();
+        // Sort before trimming so the file always lists the highest attack counts first.
+        LinkedHashMap<String, Integer> mergedBullied = sortedBulliedAttacks(mergedBulliedAttacks());
         trimBullied(mergedBullied);
 
         Map<String, Object> data = getData(now, newTotalRuntimeMs, mergedBullied);
@@ -223,9 +224,22 @@ public class PlayerStats {
     }
 
     public synchronized List<Map.Entry<String, Integer>> getTopBullied(int limit) {
-        List<Map.Entry<String, Integer>> list = new ArrayList<>(mergedBulliedAttacks().entrySet());
-        list.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+        List<Map.Entry<String, Integer>> list = new ArrayList<>(sortedBulliedAttacks(mergedBulliedAttacks()).entrySet());
         return list.subList(0, Math.min(limit, list.size()));
+    }
+
+    private LinkedHashMap<String, Integer> sortedBulliedAttacks(Map<String, Integer> attacks) {
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>(attacks.entrySet());
+        entries.sort((a, b) -> {
+            int byAttacks = Integer.compare(b.getValue(), a.getValue());
+            return byAttacks != 0 ? byAttacks : a.getKey().compareToIgnoreCase(b.getKey());
+        });
+
+        LinkedHashMap<String, Integer> sorted = new LinkedHashMap<>();
+        for (Map.Entry<String, Integer> e : entries) {
+            sorted.put(e.getKey(), e.getValue());
+        }
+        return sorted;
     }
 
     private DiskStats readFromDisk(Path path) throws IOException {
