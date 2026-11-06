@@ -21,7 +21,7 @@ import javax.inject.Inject;
 		enabledByDefault = false,
 		authors = {"Viruz Scripts"},
 		version = ViruzFFABotScript.VERSION,
-		minClientVersion = "2.6.30",
+		minClientVersion = "2.6.54",
 		isExternal = true
 )
 @Slf4j
