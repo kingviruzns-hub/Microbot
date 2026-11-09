@@ -38,8 +38,6 @@ public class SkillsHandler extends AgentHandler {
 		List<Map<String, Object>> skills = Microbot.getClientThread().runOnClientThreadOptional(() -> {
 			List<Map<String, Object>> result = new ArrayList<>();
 			for (Skill skill : Skill.values()) {
-				if (skill == Skill.OVERALL) continue;
-
 				if (nameFilter != null && !nameFilter.isEmpty()
 						&& !skill.getName().equalsIgnoreCase(nameFilter)) {
 					continue;

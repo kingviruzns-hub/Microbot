@@ -227,9 +227,18 @@ public class ViruzBotControl extends Script {
             case "!delbphat":
                 handleDelBphat(arg);
                 break;
+            case "!farm":
+                handleFarm();
+                break;
+            case "!stopfarm":
+                handleStopFarm();
+                break;
+            case "!restock":
+                handleRestock();
+                break;
             default:
                 sendEmbed("❓ Unknown Command",
-                        "I don't recognize `" + cmd + "`.\nTry `!add`, `!del`, `!stats`, `!seen`, `!addbphat` or `!delbphat`.",
+                        "I don't recognize `" + cmd + "`.\nTry `!add`, `!del`, `!stats`, `!seen`, `!addbphat`, `!delbphat`, `!farm`, `!stopfarm` or `!restock`.",
                         COLOR_ERROR);
                 break;
         }
@@ -426,6 +435,50 @@ public class ViruzBotControl extends Script {
         }
     }
 
+    // ------------------------------------------------------------------ startup mode commands
+
+    private void handleFarm() {
+        ViruzFFABotScript s = activeScript();
+        if (s == null) {
+            sendEmbed("❌ Bot Not Running",
+                    "No Viruz FFA bot client is available to start farm mode.",
+                    COLOR_ERROR);
+            return;
+        }
+        s.beginFarmMode();
+        sendEmbed("🌾 Farm Mode Requested",
+                "The bot will farm Air talismans endlessly and sell them at the GE.\nUse `!stopfarm` to resume the FFA loop.",
+                COLOR_SUCCESS);
+    }
+
+    private void handleStopFarm() {
+        ViruzFFABotScript s = activeScript();
+        if (s == null) {
+            sendEmbed("❌ Bot Not Running",
+                    "No Viruz FFA bot client is available to stop farm mode.",
+                    COLOR_ERROR);
+            return;
+        }
+        s.stopFarmMode();
+        sendEmbed("⏹️ Stop Farm Requested",
+                "Farm mode will stop on the next tick and the FFA loop resumes.",
+                COLOR_INFO);
+    }
+
+    private void handleRestock() {
+        ViruzFFABotScript s = activeScript();
+        if (s == null) {
+            sendEmbed("❌ Bot Not Running",
+                    "No Viruz FFA bot client is available to start a restock run.",
+                    COLOR_ERROR);
+            return;
+        }
+        s.beginRestockMode();
+        sendEmbed("🔁 Restock Requested",
+                "The bot will run one restock/bootstrap pass (gear, runes and training).",
+                COLOR_INFO);
+    }
+
     // ------------------------------------------------------------------ file helpers
 
     private boolean addToNsList(String name) {
@@ -571,16 +624,23 @@ public class ViruzBotControl extends Script {
         return null;
     }
 
+    private ViruzFFABotScript activeScript() {
+        if (botScript != null) return botScript;
+        if (script != null) return script;
+        try {
+            ViruzFFABotPlugin plugin = Microbot.getPlugin(ViruzFFABotPlugin.class);
+            if (plugin != null) return plugin.getScript();
+        } catch (Exception e) {
+            log.warn("Failed to resolve the bot client script: {}", e.getMessage());
+        }
+        return null;
+    }
+
     private void reloadBotClientNsList() {
         try {
-            ViruzFFABotScript s = botScript != null ? botScript : script;
+            ViruzFFABotScript s = activeScript();
             if (s != null) {
                 s.reloadNsList();
-                return;
-            }
-            ViruzFFABotPlugin plugin = Microbot.getPlugin(ViruzFFABotPlugin.class);
-            if (plugin != null && plugin.getScript() != null) {
-                plugin.getScript().reloadNsList();
             }
         } catch (Exception e) {
             log.warn("Failed to reload nslist in bot client: {}", e.getMessage());

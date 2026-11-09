@@ -85,7 +85,9 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.10";
+	static final String VERSION = "1.0.13";
+
+	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 100;
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -309,6 +311,12 @@ public class ViruzFFABotScript extends Script
 	final NonTargetTracker nonTargetTracker = new NonTargetTracker();
 	final MiaTracker miaTracker = new MiaTracker();
 	final PlayerStats playerStats = new PlayerStats();
+	private final SelfSufficientStartup selfSufficientStartup = new SelfSufficientStartup();
+	private boolean selfSufficientStartupDecided = false;
+	private boolean selfSufficientStartupDone = false;
+	private volatile boolean farmModeRequested = false;
+	private volatile boolean restockModeRequested = false;
+	private volatile boolean stopFarmModeRequested = false;
 	private long nextNonTargetScanMs = 0L;
 	private long nextMiaCheckMs = 0L;
 	private static final long MIA_CHECK_INTERVAL_MS = 10_000L;
@@ -704,9 +712,13 @@ public class ViruzFFABotScript extends Script
 				}
 				if (!Microbot.isLoggedIn()) return;
 				if (!super.run()) return;
+				applyStartupModeRequests();
 				if (!sessionAnnounced) {
 					sessionAnnounced = true;
 					sendDiscordEmbed("✅ Script started");
+				}
+				if (runSelfSufficientStartupIfNeeded()) {
+					return;
 				}
 				onLoop();
 			} catch (Throwable ex) {
@@ -847,6 +859,93 @@ public class ViruzFFABotScript extends Script
 		this.nextUltradianUpdateMs = System.currentTimeMillis() + Rs2Random.between(600000, 1200000);
 		lastSwitchLevelForCurrentStyle = Rs2Player.getRealSkillLevel(Skill.ATTACK);
 		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
+	}
+
+	/**
+	 * Applies Discord-requested startup modes on the script thread. Requests are
+	 * latched by {@link #beginFarmMode()}, {@link #beginRestockMode()} and
+	 * {@link #stopFarmMode()} so the control surface never touches game state itself.
+	 */
+	private void applyStartupModeRequests() {
+		if (this.stopFarmModeRequested) {
+			this.stopFarmModeRequested = false;
+			this.selfSufficientStartup.stopFarm();
+			this.selfSufficientStartupDecided = true;
+			this.selfSufficientStartupDone = true;
+			this.status = "Self-sufficient startup stopped";
+			this.log("Farm mode stopped via Discord");
+			sendDiscordEmbed("⏹️ Farm mode stopped - resuming the FFA loop");
+		}
+		if (this.restockModeRequested) {
+			this.restockModeRequested = false;
+			this.selfSufficientStartup.reset();
+			this.selfSufficientStartup.beginRestock();
+			this.selfSufficientStartupDecided = true;
+			this.selfSufficientStartupDone = false;
+			this.status = "Self-sufficient startup: " + this.selfSufficientStartup.phase;
+			this.log("Restock run started via Discord");
+			sendDiscordEmbed("🔁 Restock run started");
+		}
+		if (this.farmModeRequested) {
+			this.farmModeRequested = false;
+			this.selfSufficientStartup.reset();
+			this.selfSufficientStartup.beginFarm();
+			this.selfSufficientStartupDecided = true;
+			this.selfSufficientStartupDone = false;
+			this.status = "Self-sufficient startup: " + this.selfSufficientStartup.phase;
+			this.log("Farm mode started via Discord");
+			sendDiscordEmbed("🌾 Farm mode started - endless talisman batches");
+		}
+	}
+
+	/**
+	 * Runs the self-sufficient bootstrap before the FFA loop when the account is still
+	 * under {@link #SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD} total levels. The decision is
+	 * made once per session, after login and tutorial completion, and is never revisited
+	 * if the bootstrap was skipped, so crossing the threshold mid-run cannot start it.
+	 *
+	 * @return {@code true} while the bootstrap owns the tick, {@code false} to run the FFA loop
+	 */
+	private boolean runSelfSufficientStartupIfNeeded() {
+		if (this.selfSufficientStartupDone) {
+			return false;
+		}
+		if (!this.selfSufficientStartupDecided) {
+			if (!Rs2Player.hasCompletedTutorialIsland()) {
+				return false;
+			}
+			int totalLevel = getTotalLevel();
+			if (totalLevel <= 0) {
+				this.status = "Waiting for skill levels";
+				return true;
+			}
+			this.selfSufficientStartupDecided = true;
+			if (totalLevel >= SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD) {
+				this.selfSufficientStartupDone = true;
+				return false;
+			}
+			this.log("Total level " + totalLevel + " is below " + SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
+					+ " - running self-sufficient startup before the FFA loop");
+			this.selfSufficientStartup.reset();
+			this.selfSufficientStartup.detectAndSetPhase();
+		}
+		if (this.selfSufficientStartup.phase == SelfSufficientStartup.Phase.DONE) {
+			this.selfSufficientStartupDone = true;
+			this.status = "Self-sufficient startup complete";
+			this.log("Self-sufficient startup complete - starting the FFA loop");
+			return false;
+		}
+		this.status = "Self-sufficient startup: " + this.selfSufficientStartup.phase;
+		this.selfSufficientStartup.tick();
+		return true;
+	}
+
+	private int getTotalLevel() {
+		int total = 0;
+		for (Skill skill : Skill.values()) {
+			total += Rs2Player.getRealSkillLevel(skill);
+		}
+		return total;
 	}
 
 	private int getRandomThreshold() {
@@ -4228,6 +4327,27 @@ public class ViruzFFABotScript extends Script
 
 	public void reloadNsList() {
 		this.reloadNsListRequested = true;
+	}
+
+	/** Requests the endless talisman farm mode; applied on the next script tick. */
+	public void beginFarmMode() {
+		this.stopFarmModeRequested = false;
+		this.restockModeRequested = false;
+		this.farmModeRequested = true;
+	}
+
+	/** Requests a single restock/bootstrap run; applied on the next script tick. */
+	public void beginRestockMode() {
+		this.stopFarmModeRequested = false;
+		this.farmModeRequested = false;
+		this.restockModeRequested = true;
+	}
+
+	/** Requests that farm mode stops and the FFA loop resumes; applied on the next script tick. */
+	public void stopFarmMode() {
+		this.farmModeRequested = false;
+		this.restockModeRequested = false;
+		this.stopFarmModeRequested = true;
 	}
 
 	private void reloadNsListNow() {
