@@ -17,19 +17,15 @@ import org.jetbrains.annotations.NotNull;
 public class PlayerStats {
     private static final int MAX_BULLIED = 20;
     private static final long SAVE_INTERVAL_MS = 5_000L;
+    private static final String EMPTY_ROW_NAME = "-";
 
-    // Total runtime persisted to stats.json as of lastPersistMs.
     private final AtomicLong totalRuntimeMs = new AtomicLong(0);
-    // Wall-clock start of the current session (used for "Current Runtime").
     private volatile long sessionStartMs = 0L;
-    // When totalRuntimeMs was last read from / written to stats.json.
     private volatile long lastPersistMs = 0L;
     private long xpAtStart = 0L;
     private long totalXpEarned = 0L;
 
-    // Attacks already persisted to stats.json.
     private final LinkedHashMap<String, Integer> persistedBulliedAttacks = new LinkedHashMap<>();
-    // Attacks recorded this session that have not been persisted yet.
     private final LinkedHashMap<String, Integer> sessionBulliedAttacks = new LinkedHashMap<>();
 
     private long lastSaveMs = System.currentTimeMillis();
@@ -39,9 +35,6 @@ public class PlayerStats {
     private static final Type BULLIED_LIST_TYPE = new TypeToken<List<Map<String, Object>>>(){}.getType();
 
     public synchronized void startSession() {
-        // Keep anything that was recorded but not written yet before starting fresh.
-        // Do not call save() here: the gap since the last save may include time the
-        // client was offline, which must not count as runtime.
         mergeSessionIntoPersisted();
 
         sessionStartMs = System.currentTimeMillis();
@@ -104,15 +97,11 @@ public class PlayerStats {
             deltaMs = 0L;
         }
 
-        // Always refresh from stats.json before adding this session's changes so a
-        // previous session's totals are never overwritten by this one.
         Path path = Paths.get(Config.getStatsFilePath());
         DiskStats disk;
         try {
             disk = readFromDisk(path);
         } catch (Exception e) {
-            // Do not write if the existing file exists but cannot be read, otherwise
-            // we would replace valid totals with only this session's numbers.
             System.err.println("PlayerStats: Could not read stats.json before saving; skipping save: " + e.getMessage());
             return;
         }
@@ -127,7 +116,6 @@ public class PlayerStats {
         }
         long newTotalRuntimeMs = baseRuntimeMs + deltaMs;
 
-        // Sort before trimming so the file always lists the highest attack counts first.
         LinkedHashMap<String, Integer> mergedBullied = sortedBulliedAttacks(mergedBulliedAttacks());
         trimBullied(mergedBullied);
 
@@ -170,6 +158,12 @@ public class PlayerStats {
         data.put("RuntimeMs", newTotalRuntimeMs);
         data.put("XP Earned", totalXpEarned);
 
+        List<Map<String, Object>> bulliedList = createBulliedList(mergedBullied);
+        data.put("Most Bullied", bulliedList);
+        return data;
+    }
+
+    private static @NotNull List<Map<String, Object>> createBulliedList(LinkedHashMap<String, Integer> mergedBullied) {
         List<Map<String, Object>> bulliedList = new ArrayList<>();
         for (Map.Entry<String, Integer> e : mergedBullied.entrySet()) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -177,8 +171,13 @@ public class PlayerStats {
             entry.put("attacks", e.getValue());
             bulliedList.add(entry);
         }
-        data.put("Most Bullied", bulliedList);
-        return data;
+        while (bulliedList.size() < MAX_BULLIED) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("name", EMPTY_ROW_NAME);
+            entry.put("attacks", 0);
+            bulliedList.add(entry);
+        }
+        return bulliedList;
     }
 
     public synchronized void load() {
@@ -211,8 +210,6 @@ public class PlayerStats {
         }
     }
 
-    // Deliberately not synchronized: the HUD calls this from the client thread while
-    // save() may be waiting on the client thread to read XP.
     public String getRuntimeString() {
         long now = System.currentTimeMillis();
         long anchor = lastPersistMs > 0L ? lastPersistMs : sessionStartMs;

@@ -1,5 +1,6 @@
 package net.runelite.client.plugins.microbot.viruzosbot;
 
+import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,8 +13,10 @@ import net.runelite.api.GrandExchangeOffer;
 import net.runelite.api.GrandExchangeOfferState;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
+import net.runelite.api.MenuAction;
 import net.runelite.api.NPC;
 import net.runelite.api.Skill;
+import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
@@ -31,6 +34,7 @@ import net.runelite.client.plugins.microbot.util.inventory.Rs2Inventory;
 import net.runelite.client.plugins.microbot.util.inventory.Rs2ItemModel;
 import net.runelite.client.plugins.microbot.util.magic.Rs2CombatSpells;
 import net.runelite.client.plugins.microbot.util.magic.Rs2Magic;
+import net.runelite.client.plugins.microbot.util.menu.NewMenuEntry;
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.tabs.Rs2Tab;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
@@ -79,6 +83,10 @@ public class SelfSufficientStartup {
 
     private static final int MIND_RUNE_TARGET = 6000;
 
+    private static final int ENDGAME_MIND_RUNE_TARGET = 10000;
+
+    private static final int ENDGAME_COIN_BUFFER = 2000;
+
     private static final int WATER_RUNE_TARGET = 3000;
 
     private static final int MIND_RUNE_BUY_PRICE = 4;
@@ -97,12 +105,39 @@ public class SelfSufficientStartup {
 
     private static final int DEFENCE_TARGET = 40;
 
-    /** Magic level at which training switches from Wind Strike to Water Strike. */
+    private static final int TOTAL_LEVEL_TARGET = 100;
+
     private static final int WATER_STRIKE_MAGIC_LEVEL = 5;
 
     private static final int DEFENSIVE_CASTING_ON = 1;
 
     private static final int TALISMAN_SELL_PRICE = 130;
+
+    private static final WorldPoint CLAN_WARS_TILE = new WorldPoint(3150, 3635, 0);
+
+    private static final WorldPoint LOBBY_TILE = new WorldPoint(3133, 3630, 0);
+
+    private static final WorldArea LOBBY_AREA = new WorldArea(3128, 3625, 11, 11, 0);
+
+    private static final int CLAN_WARS_ARRIVAL_DISTANCE = 40;
+
+    private static final String CLAN_WARS_MINIGAME = "Clan Wars";
+
+    private static final int GROUPING_BUTTON_COMPONENT_ID = 46333957; // 707.5
+
+    private static final int DROPDOWN_BUTTON_COMPONENT_ID = 4980760; // 76.24
+
+    private static final int DROPDOWN_SELECTED_SPRITE_ID = 773;
+
+    private static final int MINIGAME_LIST = 4980758; // 76.22
+
+    private static final int SELECTED_MINIGAME = 4980747; // 76.11
+
+    private static final int MINIGAME_TELEPORT_BUTTON = 4980768; // 76.32
+
+    private static final Object[] GROUPING_SELECTED_OP = new Object[]{489, 0, 0};
+
+    private static final int[] MINIGAME_TELEPORT_GRAPHICS = new int[]{800, 802, 803, 804};
 
     static int TALISMAN_BATCHES = 4;
 
@@ -138,8 +173,10 @@ public class SelfSufficientStartup {
 
     public boolean farm = false;
 
+    public boolean endgame = false;
+
     public enum Phase {
-        BANK_ITEMS, GO_TO_DUKE, FARM_TALISMANS, BANK_NOTE_BATCH, WALK_TO_GE, SELL_TALISMANS, BUY_GEAR, BUY_RUNES, EQUIP_GEAR, TRAIN_TELEPORT, TRAIN_WALK, TRAIN, FINALIZE, DONE
+        BANK_ITEMS, GO_TO_DUKE, FARM_TALISMANS, BANK_NOTE_BATCH, WALK_TO_GE, SELL_TALISMANS, BUY_GEAR, BUY_RUNES, EQUIP_GEAR, TRAIN_TELEPORT, TRAIN_WALK, TRAIN, FINALIZE, TELEPORT_CLAN_WARS, WALK_TO_LOBBY, DONE
     }
 
     public Phase phase = Phase.BANK_ITEMS;
@@ -151,6 +188,10 @@ public class SelfSufficientStartup {
     private int groundDropCount = 0;
 
     private int dropsSinceLastRefresh = 0;
+
+    private int clanWarsTeleportTries = 0;
+
+    private int lobbyWalkTries = 0;
 
     private final Map<Integer, Integer> runePrice = new HashMap<>();
 
@@ -167,7 +208,7 @@ public class SelfSufficientStartup {
     private final Set<String> gearGaveUp = new HashSet<>();
 
     private int batchTarget() {
-        if (this.restock || this.farm) {
+        if (this.restock || this.farm || this.endgame) {
             int fit = Rs2Inventory.emptySlotCount() + Rs2Inventory.count(1438);
             return Math.max(1, Math.min(28, fit));
         }
@@ -214,10 +255,13 @@ public class SelfSufficientStartup {
         this.dropsSinceLastRefresh = 0;
         this.restock = false;
         this.farm = false;
+        this.endgame = false;
         this.finalizeTries = 0;
         this.batchesThisRun = TALISMAN_BATCHES;
         this.sellTries = 0;
         this.tpTries = 0;
+        this.clanWarsTeleportTries = 0;
+        this.lobbyWalkTries = 0;
         this.lastTp = 0L;
         this.noRunesSince = 0L;
         this.autoCastRejectLevel = -1;
@@ -227,6 +271,7 @@ public class SelfSufficientStartup {
     public void beginRestock() {
         this.restock = true;
         this.farm = false;
+        this.endgame = false;
         this.restockFresh = true;
         this.batchesThisRun = RESTOCK_BATCHES;
         this.talismanBatch = 1;
@@ -235,13 +280,10 @@ public class SelfSufficientStartup {
         detectAndSetPhase();
     }
 
-    /**
-     * Starts the endless talisman farm: the gear/runes bootstrap is skipped and each
-     * sell cycle loops straight back to the Duke instead of finishing at {@link Phase#DONE}.
-     */
     public void beginFarm() {
         this.farm = true;
         this.restock = false;
+        this.endgame = false;
         restartFarmCycle();
         log.info("[SS] FARM mode started - endless talisman batches");
     }
@@ -445,6 +487,12 @@ public class SelfSufficientStartup {
                 break;
             case FINALIZE:
                 doFinalize();
+                break;
+            case TELEPORT_CLAN_WARS:
+                doTeleportClanWars();
+                break;
+            case WALK_TO_LOBBY:
+                doWalkToLobby();
                 break;
         }
     }
@@ -734,6 +782,17 @@ public class SelfSufficientStartup {
         Global.sleep(800, 1200);
         if ((openTalismanSellPrice() > 0 || !Rs2Inventory.hasItem("Coins")) && !Rs2Inventory.hasItem("Coins"))
             return;
+        if (this.endgame) {
+            if (geBuyActive(MIND_RUNE_ID) || endgameRuneShortfall() <= 0 || coins() >= endgameRuneCost()) {
+                this.phase = Phase.BUY_RUNES;
+                log.info("[SS] SELL_TALISMANS complete ({} coins, {} mind runes) - buying the FFA rune stack", coins(), mindRunes());
+            } else {
+                log.info("[SS] SELL_TALISMANS complete ({} coins) - {} mind runes still needed (about {} coins), farming more",
+                        coins(), endgameRuneShortfall(), endgameRuneCost());
+                restartEndgameFarmCycle();
+            }
+            return;
+        }
         this.phase = (this.restock && allGearOwnedOrEquipped()) ? Phase.BUY_RUNES : Phase.BUY_GEAR;
         log.info("[SS] SELL_TALISMANS complete ({} coins), moving to {}", coins(), this.phase);
     }
@@ -841,6 +900,10 @@ public class SelfSufficientStartup {
         Rs2GrandExchange.collectAllToInventory();
         Global.sleep(300, 500);
         long now = System.currentTimeMillis();
+        if (this.endgame) {
+            doBuyEndgameRunes(now);
+            return;
+        }
         if (mindRunes() < MIND_RUNE_TARGET && buyRuneStep(MIND_RUNE_ID, MIND_RUNE_NAME, MIND_RUNE_TARGET, now))
             return;
         if (waterRunes() < WATER_RUNE_TARGET && buyRuneStep(WATER_RUNE_ID, WATER_RUNE_NAME, WATER_RUNE_TARGET, now))
@@ -849,6 +912,29 @@ public class SelfSufficientStartup {
         Global.sleepUntil(() -> !Rs2GrandExchange.isOpen(), 3000);
         this.phase = Phase.EQUIP_GEAR;
         log.info("[SS] BUY_RUNES complete (mind {}, water {}, coins left {}), moving to EQUIP_GEAR", mindRunes(), waterRunes(), coins());
+    }
+
+    private void doBuyEndgameRunes(long now) {
+        if (mindRunes() < ENDGAME_MIND_RUNE_TARGET) {
+            if (buyRuneStep(MIND_RUNE_ID, MIND_RUNE_NAME, ENDGAME_MIND_RUNE_TARGET, now))
+                return;
+            if (geBuyActive(MIND_RUNE_ID)) {
+                Global.sleep(600, 900);
+                return;
+            }
+            if (mindRunes() < ENDGAME_MIND_RUNE_TARGET) {
+                log.info("[SS] BUY_RUNES: {} mind runes still needed, only {} coins at {} each - farming more talismans",
+                        ENDGAME_MIND_RUNE_TARGET - mindRunes(), coins(), runePrice(MIND_RUNE_ID));
+                restartEndgameFarmCycle();
+                return;
+            }
+        }
+        Rs2GrandExchange.closeExchange();
+        Global.sleepUntil(() -> !Rs2GrandExchange.isOpen(), 3000);
+        this.clanWarsTeleportTries = 0;
+        this.lobbyWalkTries = 0;
+        this.phase = Phase.TELEPORT_CLAN_WARS;
+        log.info("[SS] BUY_RUNES complete ({} mind runes, {} coins left) - teleporting to Clan Wars", mindRunes(), coins());
     }
 
     private boolean buyRuneStep(int id, String name, int target, long now) {
@@ -895,6 +981,59 @@ public class SelfSufficientStartup {
         this.runeOfferAt.put(id, now);
         Global.sleep(600, 900);
         return true;
+    }
+
+    private int endgameRuneShortfall() {
+        return Math.max(0, ENDGAME_MIND_RUNE_TARGET - mindRunes());
+    }
+
+    private int endgameRuneCost() {
+        int shortfall = endgameRuneShortfall();
+        if (shortfall <= 0)
+            return 0;
+        return shortfall * runePrice(MIND_RUNE_ID) + ENDGAME_COIN_BUFFER;
+    }
+
+    private void beginEndgameRunes() {
+        this.endgame = true;
+        this.restock = false;
+        this.farm = false;
+        this.talismanBatch = 1;
+        this.batchesThisRun = TALISMAN_BATCHES;
+        this.groundDropCount = 0;
+        this.dropsSinceLastRefresh = 0;
+        this.sellTries = 0;
+        this.clanWarsTeleportTries = 0;
+        this.lobbyWalkTries = 0;
+        resetMarketState();
+        if (endgameRuneShortfall() <= 0) {
+            this.phase = Phase.TELEPORT_CLAN_WARS;
+        } else if (coins() >= endgameRuneCost()) {
+            this.phase = Phase.WALK_TO_GE;
+        } else {
+            this.phase = Phase.GO_TO_DUKE;
+        }
+        log.info("[SS] Endgame rune grind started - {} mind runes needed ({}), {} coins held, phase {}",
+                endgameRuneShortfall(), ENDGAME_MIND_RUNE_TARGET, coins(), this.phase);
+    }
+
+    private void restartEndgameFarmCycle() {
+        if (Rs2GrandExchange.isOpen()) {
+            Rs2GrandExchange.abortAllOffers(false);
+            Global.sleep(800, 1200);
+            Rs2GrandExchange.collectAllToInventory();
+            Global.sleep(300, 500);
+            Rs2GrandExchange.closeExchange();
+            Global.sleepUntil(() -> !Rs2GrandExchange.isOpen(), 3000);
+        }
+        this.talismanBatch = 1;
+        this.batchesThisRun = TALISMAN_BATCHES;
+        this.groundDropCount = 0;
+        this.dropsSinceLastRefresh = 0;
+        this.sellTries = 0;
+        resetMarketState();
+        this.phase = Phase.GO_TO_DUKE;
+        log.info("[SS] Endgame farm cycle restarted - moving to GO_TO_DUKE");
     }
 
     private void doEquipGear() {
@@ -1008,7 +1147,15 @@ public class SelfSufficientStartup {
     }
 
     public boolean trainNeeded() {
-        return magicLvl() < MAGIC_TARGET || defenceLvl() < DEFENCE_TARGET;
+        return magicLvl() < MAGIC_TARGET
+                || defenceLvl() < DEFENCE_TARGET
+                || totalLevel() <= TOTAL_LEVEL_TARGET;
+    }
+
+    private int totalLevel() {
+        return Microbot.getClientThread()
+                .runOnClientThreadOptional(() -> Microbot.getClient().getTotalLevel())
+                .orElse(0);
     }
 
     private Phase trainEntryPhase() {
@@ -1095,11 +1242,6 @@ public class SelfSufficientStartup {
         }
     }
 
-    /**
-     * Wind Strike until {@link #WATER_STRIKE_MAGIC_LEVEL}, then Water Strike while water runes last.
-     * A rejected Water Strike (e.g. the level is still too low) is remembered for the current magic
-     * level so the script does not retry it every tick.
-     */
     private Rs2CombatSpells desiredAutoCastSpell() {
         if (magicLvl() >= WATER_STRIKE_MAGIC_LEVEL
                 && waterRunes() > 0
@@ -1115,8 +1257,8 @@ public class SelfSufficientStartup {
             return;
         }
         if (!trainNeeded()) {
-            this.phase = Phase.FINALIZE;
-            log.info("[SS] TRAIN complete (Magic {}, Defence {}) - finalizing", magicLvl(), defenceLvl());
+            log.info("[SS] TRAIN complete (Magic {}, Defence {}, Total {}) - starting the rune grind", magicLvl(), defenceLvl(), totalLevel());
+            beginEndgameRunes();
             return;
         }
         WorldPoint p = Rs2Player.getWorldLocation();
@@ -1158,5 +1300,128 @@ public class SelfSufficientStartup {
             return;
         }
         Global.sleepUntil(() -> (Rs2Player.getInteracting() != null), 1500);
+    }
+
+    private void doTeleportClanWars() {
+        WorldPoint p = Rs2Player.getWorldLocation();
+        if (nearClanWars(p)) {
+            this.phase = Phase.WALK_TO_LOBBY;
+            log.info("[SS] TELEPORT_CLAN_WARS: already at Clan Wars/Ferox Enclave");
+            return;
+        }
+        if (this.clanWarsTeleportTries >= 3) {
+            log.warn("[SS] TELEPORT_CLAN_WARS: minigame teleport did not land after {} tries - walking instead", this.clanWarsTeleportTries);
+            Rs2Walker.walkTo(CLAN_WARS_TILE, 3);
+            this.phase = Phase.WALK_TO_LOBBY;
+            return;
+        }
+        this.clanWarsTeleportTries++;
+        log.info("[SS] TELEPORT_CLAN_WARS: using the Clan Wars minigame teleport (try {})", this.clanWarsTeleportTries);
+        if (minigameTeleportToClanWars()) {
+            this.phase = Phase.WALK_TO_LOBBY;
+        } else {
+            log.warn("[SS] TELEPORT_CLAN_WARS: teleport attempt {} failed", this.clanWarsTeleportTries);
+            Global.sleep(600, 1000);
+        }
+    }
+
+    private void doWalkToLobby() {
+        if (nearLobby(Rs2Player.getWorldLocation())) {
+            this.phase = Phase.DONE;
+            log.info("[SS] WALK_TO_LOBBY complete - handing over to the FFA loop");
+            return;
+        }
+        if (this.lobbyWalkTries >= 6) {
+            log.warn("[SS] WALK_TO_LOBBY: could not reach the lobby after {} walks - handing over anyway", this.lobbyWalkTries);
+            this.phase = Phase.DONE;
+            return;
+        }
+        this.lobbyWalkTries++;
+        Rs2Walker.walkTo(LOBBY_TILE, 2);
+    }
+
+    private boolean nearClanWars(WorldPoint p) {
+        return (p != null && p.getY() < 4000 && p.distanceTo2D(CLAN_WARS_TILE) <= CLAN_WARS_ARRIVAL_DISTANCE);
+    }
+
+    private boolean nearLobby(WorldPoint p) {
+        return p != null && LOBBY_AREA.contains(p);
+    }
+
+    private boolean minigameTeleportToClanWars() {
+        if (Rs2Dialogue.isInDialogue()) {
+            Rs2Dialogue.clickContinue();
+            Global.sleep(300, 500);
+            return false;
+        }
+        if (!Rs2Tab.switchTo(InterfaceTab.CHAT)) {
+            log.warn("[SS] TELEPORT_CLAN_WARS: could not open the grouping/chat tab");
+            return false;
+        }
+        Global.sleepUntil(() -> Rs2Tab.getCurrentTab() == InterfaceTab.CHAT, 2000);
+        Widget groupingBtn = Rs2Widget.getWidget(GROUPING_BUTTON_COMPONENT_ID);
+        if (groupingBtn == null)
+            return false;
+        if (!Arrays.equals(groupingBtn.getOnOpListener(), GROUPING_SELECTED_OP)) {
+            Rs2Widget.clickWidget(groupingBtn);
+            Global.sleepUntil(() -> {
+                Widget b = Rs2Widget.getWidget(GROUPING_BUTTON_COMPONENT_ID);
+                return b != null && Arrays.equals(b.getOnOpListener(), GROUPING_SELECTED_OP);
+            }, 2000);
+        }
+        Widget selectedWidget = Rs2Widget.getWidget(SELECTED_MINIGAME);
+        if (selectedWidget == null)
+            return false;
+        if (selectedWidget.getText() == null || !selectedWidget.getText().equalsIgnoreCase(CLAN_WARS_MINIGAME)) {
+            Widget dropdownBtn = Rs2Widget.getWidget(DROPDOWN_BUTTON_COMPONENT_ID);
+            if (dropdownBtn == null)
+                return false;
+            if (dropdownBtn.getSpriteId() != DROPDOWN_SELECTED_SPRITE_ID) {
+                Rs2Widget.clickWidget(dropdownBtn);
+                Global.sleepUntil(() -> {
+                    Widget open = Rs2Widget.getWidget(DROPDOWN_BUTTON_COMPONENT_ID);
+                    return Rs2Widget.findWidget(DROPDOWN_SELECTED_SPRITE_ID, open == null ? List.of() : List.of(open)) != null;
+                }, 2000);
+            }
+            Widget list = Rs2Widget.getWidget(MINIGAME_LIST);
+            if (list == null || list.getDynamicChildren() == null)
+                return false;
+            Widget destinationWidget = Rs2Widget.findWidget(CLAN_WARS_MINIGAME, Arrays.asList(list.getDynamicChildren()));
+            if (destinationWidget == null) {
+                log.warn("[SS] TELEPORT_CLAN_WARS: '{}' not found in the minigame list", CLAN_WARS_MINIGAME);
+                return false;
+            }
+            NewMenuEntry entry = new NewMenuEntry()
+                    .option("Select")
+                    .target("")
+                    .identifier(1)
+                    .type(MenuAction.CC_OP)
+                    .param0(destinationWidget.getIndex())
+                    .param1(list.getId())
+                    .forceLeftClick(false);
+            Microbot.doInvoke(entry, new Rectangle(1, 1));
+            boolean selected = Global.sleepUntil(() -> {
+                Widget w = Rs2Widget.getWidget(SELECTED_MINIGAME);
+                return w != null && w.getText() != null && w.getText().equalsIgnoreCase(CLAN_WARS_MINIGAME);
+            }, 2000);
+            if (!selected)
+                return false;
+        }
+        Widget teleportBtn = Rs2Widget.getWidget(MINIGAME_TELEPORT_BUTTON);
+        if (teleportBtn == null)
+            return false;
+        Rs2Widget.clickWidget(teleportBtn);
+        Global.sleepUntil(Rs2Player::isAnimating, 2000);
+        Global.sleepUntil(() -> !Rs2Player.isAnimating() && !hasMinigameTeleportGraphic(), 20000);
+        Rs2Tab.switchTo(InterfaceTab.INVENTORY);
+        return nearClanWars(Rs2Player.getWorldLocation());
+    }
+
+    private boolean hasMinigameTeleportGraphic() {
+        for (int graphic : MINIGAME_TELEPORT_GRAPHICS) {
+            if (Rs2Player.hasSpotAnimation(graphic))
+                return true;
+        }
+        return false;
     }
 }

@@ -31,14 +31,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Discord bot control surface for the Viruz FFA bot.
- *
- * <p>Polls a configured Discord channel for text commands using {@link HttpClient},
- * {@link HttpRequest} and {@link HttpResponse}, performs the requested file
- * operations, and replies with fancy embeds. After {@code !add}/{@code !del} the
- * bot client's nslist is reloaded.</p>
- */
 @Slf4j
 public class ViruzBotControl extends Script {
 
@@ -435,8 +427,6 @@ public class ViruzBotControl extends Script {
         }
     }
 
-    // ------------------------------------------------------------------ startup mode commands
-
     private void handleFarm() {
         ViruzFFABotScript s = activeScript();
         if (s == null) {
@@ -478,8 +468,6 @@ public class ViruzBotControl extends Script {
                 "The bot will run one restock/bootstrap pass (gear, runes and training).",
                 COLOR_INFO);
     }
-
-    // ------------------------------------------------------------------ file helpers
 
     private boolean addToNsList(String name) {
         String key = name.trim().toLowerCase(Locale.ROOT);
@@ -646,8 +634,6 @@ public class ViruzBotControl extends Script {
             log.warn("Failed to reload nslist in bot client: {}", e.getMessage());
         }
     }
-
-    // ------------------------------------------------------------------ discord helpers
 
     private void sendEmbed(String title, String description, int color) {
         JsonObject embed = new JsonObject();

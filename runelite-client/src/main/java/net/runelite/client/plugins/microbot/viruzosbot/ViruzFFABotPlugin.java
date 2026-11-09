@@ -80,8 +80,6 @@ public class ViruzFFABotPlugin extends Plugin {
 			return;
 		}
 
-		// Re-read every setting so toggle/location/list changes apply immediately
-		// instead of only after the plugin is restarted.
 		script.applyConfig();
 	}
 }

@@ -85,7 +85,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.13";
+	static final String VERSION = "1.0.14";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 100;
 
@@ -747,7 +747,6 @@ public class ViruzFFABotScript extends Script
 	public void saveTrackerInfo() {
 		try {
 			java.util.Map<String, java.util.Map<String, Object>> merged = new java.util.LinkedHashMap<>();
-			// AI profiles
 			java.util.Map<String, AIAssistant.PlayerProfile> profileSnapshot = new java.util.HashMap<>(aiAssistant.getPlayerProfiles());
 			for (java.util.Map.Entry<String, AIAssistant.PlayerProfile> e : profileSnapshot.entrySet()) {
 				if (e.getKey() == null || e.getValue() == null) continue;
@@ -767,7 +766,7 @@ public class ViruzFFABotScript extends Script
 				entry.put("encounters", Math.max(prevEncN, encounters));
 				entry.put("timesAttackedUs", p.timesAttackedUs);
 			}
-			// Non-target tracker
+
 			for (java.util.Map.Entry<String, NonTargetTracker.LastSeenEntry> e : nonTargetTracker.getEntries().entrySet()) {
 				if (e.getKey() == null || e.getValue() == null) continue;
 				String key = e.getKey().toLowerCase(Locale.ROOT).trim();
@@ -786,7 +785,7 @@ public class ViruzFFABotScript extends Script
 				}
 				if (!entry.containsKey("encounters")) entry.put("encounters", 0);
 			}
-			// PlayerStats bullied
+
 			for (java.util.Map.Entry<String, Integer> e : playerStats.getTopBullied(1000)) {
 				if (e.getKey() == null) continue;
 				String key = e.getKey().toLowerCase(Locale.ROOT).trim();
@@ -798,7 +797,7 @@ public class ViruzFFABotScript extends Script
 				entry.put("encounters", Math.max(prevEncN, attacks));
 				if (!entry.containsKey("lastSeenMs")) entry.put("lastSeenMs", 0L);
 			}
-			// Build list sorted by lastSeen desc
+
 			java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>(merged.values());
 			list.sort((a, b) -> {
 				Object la = a.get("lastSeenMs");
@@ -842,7 +841,6 @@ public class ViruzFFABotScript extends Script
 		initializeAreaMap();
 		this.currentArea = this.areaMap.get(this.selectedLocation);
 		removeBlockedNamesFromFile(this.filePath);
-		// Load the previous totals from stats.json before the first save of this session.
 		playerStats.startSession();
 		this.saveTrackerInfo();
 		removeDuplicateNamesFromAllLists();
@@ -861,11 +859,6 @@ public class ViruzFFABotScript extends Script
 		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
 	}
 
-	/**
-	 * Applies Discord-requested startup modes on the script thread. Requests are
-	 * latched by {@link #beginFarmMode()}, {@link #beginRestockMode()} and
-	 * {@link #stopFarmMode()} so the control surface never touches game state itself.
-	 */
 	private void applyStartupModeRequests() {
 		if (this.stopFarmModeRequested) {
 			this.stopFarmModeRequested = false;
@@ -874,7 +867,7 @@ public class ViruzFFABotScript extends Script
 			this.selfSufficientStartupDone = true;
 			this.status = "Self-sufficient startup stopped";
 			this.log("Farm mode stopped via Discord");
-			sendDiscordEmbed("⏹️ Farm mode stopped - resuming the FFA loop");
+			sendDiscordEmbed("⏹️ Farming mode stopped - resuming the FFA loop");
 		}
 		if (this.restockModeRequested) {
 			this.restockModeRequested = false;
@@ -884,7 +877,7 @@ public class ViruzFFABotScript extends Script
 			this.selfSufficientStartupDone = false;
 			this.status = "Self-sufficient startup: " + this.selfSufficientStartup.phase;
 			this.log("Restock run started via Discord");
-			sendDiscordEmbed("🔁 Restock run started");
+			sendDiscordEmbed("🔁 Restocking run started");
 		}
 		if (this.farmModeRequested) {
 			this.farmModeRequested = false;
@@ -894,18 +887,10 @@ public class ViruzFFABotScript extends Script
 			this.selfSufficientStartupDone = false;
 			this.status = "Self-sufficient startup: " + this.selfSufficientStartup.phase;
 			this.log("Farm mode started via Discord");
-			sendDiscordEmbed("🌾 Farm mode started - endless talisman batches");
+			sendDiscordEmbed("🌾 Farming mode started - endless farm mode");
 		}
 	}
 
-	/**
-	 * Runs the self-sufficient bootstrap before the FFA loop when the account is still
-	 * under {@link #SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD} total levels. The decision is
-	 * made once per session, after login and tutorial completion, and is never revisited
-	 * if the bootstrap was skipped, so crossing the threshold mid-run cannot start it.
-	 *
-	 * @return {@code true} while the bootstrap owns the tick, {@code false} to run the FFA loop
-	 */
 	private boolean runSelfSufficientStartupIfNeeded() {
 		if (this.selfSufficientStartupDone) {
 			return false;
@@ -1193,13 +1178,6 @@ public class ViruzFFABotScript extends Script
 				|| this.currentArea.contains(tile);
 	}
 
-	/**
-	 * Detects being lured or dragged into the SAFE_ZONE (a spot where fights cannot happen) and walks
-	 * back to {@link #currentArea}. The walk is driven one step per tick through
-	 * {@link Rs2Walker#walkStep(WorldPoint, int)} so the script stays responsive and can re-check the
-	 * player position between steps. Returns true while the escape is in progress so the caller can skip
-	 * the regular combat and area handling for the current tick.
-	 */
 	private boolean handleSafeZoneEscape(Rs2PlayerModel localPlayer) {
 		if (localPlayer == null) {
 			return false;
@@ -2179,12 +2157,6 @@ public class ViruzFFABotScript extends Script
 		return targetTile != null && portal.contains(targetTile);
 	}
 
-	/**
-	 * Drag-Mode: attacks a Portal target, waits until it retaliates, then walks it to the east or
-	 * west drag tile. At the drag tile it waits for the target to catch up; if the target stopped
-	 * following it re-attacks and keeps dragging. Once the target is following again the script runs
-	 * through the safe zone (y = 4758) and back into Portal.
-	 */
 	private void dragPortalTarget(Rs2PlayerModel target, Rs2PlayerModel localPlayer) {
 		if (localPlayer == null || !playerExists(target)) return;
 		WorldPoint localTile = localPlayer.getWorldLocation();
@@ -2970,16 +2942,6 @@ public class ViruzFFABotScript extends Script
 		this.nextActionTime = System.currentTimeMillis() + delay;
 	}
 
-
-
-
-
-
-
-
-
-
-
 	private void performAntiban() {
 		try {
 			this.onAction();
@@ -3152,8 +3114,6 @@ public class ViruzFFABotScript extends Script
 			this.status = "Trackers Scan finished";
 		}
 	}
-
-
 
 	private void postCombatGlance() {
 		this.status = "Quick equipment check";
@@ -3431,10 +3391,6 @@ public class ViruzFFABotScript extends Script
 		this.sleepWithFatigue(100, 300);
 	}
 
-
-
-
-
 	private void openWorldMap() {
 		this.status = "Checking world map";
 		Rectangle mmBounds = Microbot.getClientThread().runOnClientThreadOptional(() -> {
@@ -3451,8 +3407,6 @@ public class ViruzFFABotScript extends Script
 			Global.sleep(Rs2Random.between(200, 600));
 		}
 	}
-
-
 
 	private void walkAdjust() {
 		this.status = "Adjusting position";
@@ -3472,10 +3426,6 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-
-
-
-
 	private void checkSpellbook() {
 		this.status = "Checking spellbook";
 		if (Rs2Tab.switchTo(InterfaceTab.MAGIC)) {
@@ -3487,10 +3437,6 @@ public class ViruzFFABotScript extends Script
 			Rs2Tab.switchTo(InterfaceTab.INVENTORY);
 		}
 	}
-
-
-
-
 
 	private void climbdownStairs() {
 		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
@@ -3565,9 +3511,6 @@ public class ViruzFFABotScript extends Script
 		WorldPoint lt = localPlayer.getWorldLocation();
 		if (lt == null) return;
 
-		// Standing inside the selected combat area is exactly where we want to be.
-		// Nudging away from a nearby obstacle there made the bot pace between random
-		// tiles forever (e.g. at Hills, where a climbable object is inside the area).
 		if (this.currentArea != null && this.currentArea.contains(lt)) return;
 		if (isPlayerInCombat(localPlayer)) return;
 
@@ -3748,8 +3691,6 @@ public class ViruzFFABotScript extends Script
 				}
 				if (obj.has("encounters") && obj.get("encounters").isJsonArray()) {
 					com.google.gson.JsonArray arr = obj.getAsJsonArray("encounters");
-					// Keep the latest encounter per target (by timestamp) instead of blindly
-					// dropping later ones, so the most recent target/tracker info survives.
 					java.util.LinkedHashMap<String, com.google.gson.JsonObject> bestByTarget = new java.util.LinkedHashMap<>();
 					com.google.gson.JsonArray deduped = new com.google.gson.JsonArray();
 					for (com.google.gson.JsonElement el : arr) {
@@ -3852,7 +3793,6 @@ public class ViruzFFABotScript extends Script
 
 	private static com.google.gson.JsonObject mergeProfileJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
 		com.google.gson.JsonObject out = new com.google.gson.JsonObject();
-		// Start from the entry with the newer lastSeenAt (latest target info).
 		long aSeen = getJsonLong(a, "lastSeenAt");
 		long bSeen = getJsonLong(b, "lastSeenAt");
 		com.google.gson.JsonObject latest = (bSeen >= aSeen) ? b : a;
@@ -3860,7 +3800,7 @@ public class ViruzFFABotScript extends Script
 		for (String k : latest.keySet()) {
 			out.add(k, latest.get(k).deepCopy());
 		}
-		// Merge count fields by taking the max so accumulated tracker info is preserved.
+
 		for (String field : new String[]{"encounterCount", "timesFoughtBack", "timesRanToSafe", "timesWeWon",
 				"timesAttackedUs", "timesHitAndRan", "consecutiveHitAndRuns"}) {
 			long va = a.has(field) ? getJsonLong(a, field) : 0L;
@@ -3869,29 +3809,23 @@ public class ViruzFFABotScript extends Script
 				out.addProperty(field, Math.max(va, vb));
 			}
 		}
-		// combatLevel: keep the highest known.
+
 		long ca = a.has("combatLevel") ? getJsonLong(a, "combatLevel") : 0L;
 		long cb = b.has("combatLevel") ? getJsonLong(b, "combatLevel") : 0L;
 		if (Math.max(ca, cb) > 0) out.addProperty("combatLevel", Math.max(ca, cb));
-		// lastSeenAt: keep the newest.
 		out.addProperty("lastSeenAt", Math.max(aSeen, bSeen));
-		// lastAttackOnUsAt: keep the newest.
 		long la = a.has("lastAttackOnUsAt") ? getJsonLong(a, "lastAttackOnUsAt") : 0L;
 		long lb = b.has("lastAttackOnUsAt") ? getJsonLong(b, "lastAttackOnUsAt") : 0L;
 		if (Math.max(la, lb) > 0) out.addProperty("lastAttackOnUsAt", Math.max(la, lb));
-		// gear: prefer latest non-empty.
 		if (!hasNonEmptyArray(latest) && hasNonEmptyArray(other)) {
 			out.add("gear", other.get("gear").deepCopy());
 		}
-		// threatScore: prefer latest.
 		if (latest.has("threatScore")) out.add("threatScore", latest.get("threatScore").deepCopy());
-		// status: prefer latest non-null.
 		if (latest.has("status") && !latest.get("status").isJsonNull()) {
 			out.add("status", latest.get("status").deepCopy());
 		} else if (other.has("status") && !other.get("status").isJsonNull()) {
 			out.add("status", other.get("status").deepCopy());
 		}
-		// lastSeenHp: prefer latest if present.
 		if (latest.has("lastSeenHp")) out.add("lastSeenHp", latest.get("lastSeenHp").deepCopy());
 		return out;
 	}
@@ -3904,7 +3838,6 @@ public class ViruzFFABotScript extends Script
 
 	private static com.google.gson.JsonObject mergePatternJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
 		com.google.gson.JsonObject out = new com.google.gson.JsonObject();
-		// recentAnims: concatenate (trim to 20) to preserve latest activity.
 		com.google.gson.JsonArray anims = new com.google.gson.JsonArray();
 		if (a.has("recentAnims") && a.get("recentAnims").isJsonArray()) {
 			for (com.google.gson.JsonElement e : a.getAsJsonArray("recentAnims")) anims.add(e.deepCopy());
@@ -3922,7 +3855,6 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private static com.google.gson.JsonObject mergeLastSeenJson(com.google.gson.JsonObject a, com.google.gson.JsonObject b) {
-		// Keep the entry with the newer lastSeenMs as the base, but preserve max combatLevel.
 		long aSeen = getJsonLong(a, "lastSeenMs");
 		long bSeen = getJsonLong(b, "lastSeenMs");
 		com.google.gson.JsonObject latest = (bSeen >= aSeen) ? b : a;
@@ -3934,7 +3866,6 @@ public class ViruzFFABotScript extends Script
 		long cb = b.has("combatLevel") ? getJsonLong(b, "combatLevel") : 0L;
 		if (Math.max(ca, cb) > 0) out.addProperty("combatLevel", Math.max(ca, cb));
 		out.addProperty("lastSeenMs", Math.max(aSeen, bSeen));
-		// playerName: prefer latest non-empty.
 		if (!latest.has("playerName") && a.has("playerName")) out.add("playerName", a.get("playerName").deepCopy());
 		return out;
 	}
@@ -4053,8 +3984,6 @@ public class ViruzFFABotScript extends Script
 		}
 	}
 
-
-
 	private void emoteTabHover() {
 		if (!Rs2Tab.switchTo(InterfaceTab.EMOTES)) return;
 		this.sleepWithFatigue(400, 1000);
@@ -4110,8 +4039,6 @@ public class ViruzFFABotScript extends Script
 		if (b == null) return null;
 		return new Point(b.x + b.width / 2, b.y + b.height / 2);
 	}
-
-
 
 	private static Stream<Rs2PlayerModel> getPlayers(Predicate<Rs2PlayerModel> predicate) {
 		final Player localPlayer = Microbot.getClient().getLocalPlayer();
@@ -4329,21 +4256,18 @@ public class ViruzFFABotScript extends Script
 		this.reloadNsListRequested = true;
 	}
 
-	/** Requests the endless talisman farm mode; applied on the next script tick. */
 	public void beginFarmMode() {
 		this.stopFarmModeRequested = false;
 		this.restockModeRequested = false;
 		this.farmModeRequested = true;
 	}
 
-	/** Requests a single restock/bootstrap run; applied on the next script tick. */
 	public void beginRestockMode() {
 		this.stopFarmModeRequested = false;
 		this.farmModeRequested = false;
 		this.restockModeRequested = true;
 	}
 
-	/** Requests that farm mode stops and the FFA loop resumes; applied on the next script tick. */
 	public void stopFarmMode() {
 		this.farmModeRequested = false;
 		this.restockModeRequested = false;

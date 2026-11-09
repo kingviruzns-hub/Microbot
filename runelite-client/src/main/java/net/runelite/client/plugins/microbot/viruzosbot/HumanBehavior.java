@@ -148,7 +148,6 @@ public class HumanBehavior {
         int startY = startPos.y;
         int distance = Math.max(1, (int) Math.hypot(targetX - startX, targetY - startY));
 
-        // Human mouse speed varies with distance and session fatigue
         double speedMod = 1.0;
         long elapsed = System.currentTimeMillis() - sessionStartTime;
         if (elapsed > 3600000) speedMod = 0.85 + ThreadLocalRandom.current().nextDouble() * 0.3;
@@ -158,14 +157,12 @@ public class HumanBehavior {
         steps = Math.min(steps, 100);
         double spread = distance * 0.12 + ThreadLocalRandom.current().nextDouble() * 8;
 
-        // Control points with asymmetric bias for natural arc
         double arcBias = ThreadLocalRandom.current().nextDouble() * 0.2 - 0.1;
         int cp1x = (int) (startX + (targetX - startX) * (0.2 + arcBias) + ThreadLocalRandom.current().nextGaussian() * spread * 0.4);
         int cp1y = (int) (startY + (targetY - startY) * (0.2 + arcBias) + ThreadLocalRandom.current().nextGaussian() * spread * 0.4);
         int cp2x = (int) (startX + (targetX - startX) * (0.8 - arcBias) + ThreadLocalRandom.current().nextGaussian() * spread * 0.4);
         int cp2y = (int) (startY + (targetY - startY) * (0.8 - arcBias) + ThreadLocalRandom.current().nextGaussian() * spread * 0.4);
 
-        // Micro-pauses during movement (humans pause mid-motion)
         int pauseAt = steps > 15 ? ThreadLocalRandom.current().nextInt(steps / 3, 2 * steps / 3) : -1;
         boolean didPause = false;
 
@@ -176,7 +173,6 @@ public class HumanBehavior {
             int currentY = (int) (u * u * u * startY + 3 * u * u * t * cp1y + 3 * u * t * t * cp2y + t * t * t * targetY);
             Microbot.getMouse().move(new net.runelite.api.Point(currentX, currentY));
 
-            // Bell-shaped velocity curve with occasional micro-pauses
             double velocityWeight = Math.sin(t * Math.PI);
             int stepDelay;
             if (i == pauseAt && !didPause && ThreadLocalRandom.current().nextDouble() < 0.35) {
@@ -188,7 +184,6 @@ public class HumanBehavior {
             Global.sleep(Math.max(2, stepDelay));
         }
 
-        // Fine-tune landing with possible micro-correction
         Point endPos = mousePosition();
         if (Math.abs(endPos.x - targetX) > 2 || Math.abs(endPos.y - targetY) > 2) {
             Microbot.getMouse().move(new net.runelite.api.Point(targetX, targetY));
@@ -320,12 +315,10 @@ public class HumanBehavior {
         double raw = mean + ThreadLocalRandom.current().nextGaussian() * std;
         long delay = Math.max(60, (long) raw);
 
-        // Occasional slow reaction (distracted)
         if (ThreadLocalRandom.current().nextDouble() < 0.04) {
             delay += randInclusive(600, 2500);
         }
 
-        // Very rare double-take (look away, look back)
         if (ThreadLocalRandom.current().nextDouble() < 0.008) {
             delay += randInclusive(1500, 4000);
         }
@@ -337,7 +330,6 @@ public class HumanBehavior {
         long elapsed = System.currentTimeMillis() - sessionStartTime;
         double hours = elapsed / 3600000.0;
 
-        // Action pool shifts over time - fresh sessions have more variety, fatigued sessions simpler
         if (hours < 1.0) {
             return getFreshSessionAntiBan(fatigueFactor);
         } else if (hours < 3.0) {
@@ -447,7 +439,6 @@ public class HumanBehavior {
                 Math.max(0, Math.min(SCREEN_HEIGHT, current.y + offY))
         );
 
-        // Aggressive overshoot then correct
         double heavyOvershoot = ThreadLocalRandom.current().nextDouble();
         if (heavyOvershoot < 0.1) {
             int farOffX = offX * 2 + ThreadLocalRandom.current().nextInt(-5, 6);
@@ -462,7 +453,6 @@ public class HumanBehavior {
 
         naturalMouseMovement(misclickTarget.x, misclickTarget.y);
 
-        // Sometimes pause on wrong spot before correcting
         if (ThreadLocalRandom.current().nextDouble() < 0.3) {
             Global.sleep(randInclusive(50, 200));
         }

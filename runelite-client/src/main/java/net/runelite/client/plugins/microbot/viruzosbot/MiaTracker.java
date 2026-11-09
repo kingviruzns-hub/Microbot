@@ -19,11 +19,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Tracks nslist targets that were seen online and either attacked us or were attacked by us
- * in the same combat area. When such a target has not been seen in Lobby, Safe Zone, Portal
- * or Middle for {@link #MIA_TIMEOUT_MS}, it is reported once as MIA.
- */
 public class MiaTracker {
     public static final long MIA_TIMEOUT_MS = 25L * 60L * 1000L;
 
@@ -72,10 +67,6 @@ public class MiaTracker {
         }
     }
 
-    /**
-     * Records a target being seen during a tracker scan. Only the monitored areas count as
-     * activity, so a target that moves elsewhere for long enough still becomes MIA.
-     */
     public void recordSighting(String playerName, String location, long now) {
         String key = normalizeName(playerName);
         if (key.isEmpty()) return;
@@ -86,14 +77,9 @@ public class MiaTracker {
         target.name = playerName;
         target.location = canonicalLocation(normalizedLocation);
         target.lastSeenMs = Math.max(target.lastSeenMs, now);
-        // Seeing the target again re-arms the alert for a future disappearance.
         target.alerted = false;
     }
 
-    /**
-     * Arms a target after combat. Both players must be in the same monitored area, which is
-     * what ties the engagement to a location such as Portal or Middle.
-     */
     public void recordEngagement(String playerName, String targetLocation, String localLocation, long now) {
         String key = normalizeName(playerName);
         if (key.isEmpty()) return;
@@ -111,10 +97,6 @@ public class MiaTracker {
         target.alerted = false;
     }
 
-    /**
-     * Returns targets that are due an MIA alert. Entries for names no longer in nslist are
-     * removed so stale targets cannot alert after being unlisted.
-     */
     public List<MiaAlert> collectDueAlerts(long now, Set<String> activeTargets) {
         List<MiaAlert> alerts = new ArrayList<>();
         boolean changed = false;
