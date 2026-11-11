@@ -71,7 +71,7 @@ public class SelfSufficientStartup {
 
     private static final int[] GEAR_IDS = new int[]{1042, 1381, 577, 1011, 2922, 2914, 4351, 1171, 1731};
 
-    private static final int[] GEAR_BUY_PRICE = new int[]{5000, 1500, 1000, 500, 1000, 1000, 1000, 100, 3000};
+    private static final int[] GEAR_BUY_PRICE = new int[]{18000, 1500, 1000, 1000, 1000, 2500, 1000, 500, 3000};
 
     private static final int MIND_RUNE_ID = 558;
 
@@ -105,7 +105,7 @@ public class SelfSufficientStartup {
 
     private static final int DEFENCE_TARGET = 40;
 
-    private static final int TOTAL_LEVEL_TARGET = 100;
+    private static final int TOTAL_LEVEL_TARGET = 120;
 
     private static final int WATER_STRIKE_MAGIC_LEVEL = 5;
 
@@ -142,6 +142,10 @@ public class SelfSufficientStartup {
     static int TALISMAN_BATCHES = 4;
 
     static final int RESTOCK_BATCHES = 3;
+
+    private static final int PICKUP_MAX_MISSES_PER_PASS = 5;
+
+    private static final int PICKUP_MAX_FAILED_PASSES = 3;
 
     private static final int[] KEEP_ITEM_IDS = new int[]{
             MIND_RUNE_ID, WATER_RUNE_ID,
@@ -188,6 +192,8 @@ public class SelfSufficientStartup {
     private int groundDropCount = 0;
 
     private int dropsSinceLastRefresh = 0;
+
+    private int pickupRetryCount = 0;
 
     private int clanWarsTeleportTries = 0;
 
@@ -253,6 +259,7 @@ public class SelfSufficientStartup {
         this.gearIndex = 0;
         this.groundDropCount = 0;
         this.dropsSinceLastRefresh = 0;
+        this.pickupRetryCount = 0;
         this.restock = false;
         this.farm = false;
         this.endgame = false;
@@ -302,6 +309,7 @@ public class SelfSufficientStartup {
         this.gearIndex = 0;
         this.groundDropCount = 0;
         this.dropsSinceLastRefresh = 0;
+        this.pickupRetryCount = 0;
         this.sellTries = 0;
         resetMarketState();
         this.phase = Phase.GO_TO_DUKE;
@@ -362,6 +370,7 @@ public class SelfSufficientStartup {
         log.info("[SS] Phase set to {} (batch {}/{})", this.phase, this.talismanBatch, this.batchesThisRun);
         this.groundDropCount = 0;
         this.dropsSinceLastRefresh = 0;
+        this.pickupRetryCount = 0;
     }
 
     private boolean ownsOrWears(String name) {
@@ -606,16 +615,19 @@ public class SelfSufficientStartup {
     }
 
     private void pickupAllDropped(boolean keepInInventory) {
-        if (this.groundDropCount <= 0)
+        if (this.groundDropCount <= 0) {
+            this.pickupRetryCount = 0;
             return;
+        }
         int expected = this.groundDropCount;
         log.info("[SS] Picking up {} dropped talisman(s), keep={}", expected, keepInInventory);
         Rs2Walker.walkTo(STAND_TILE);
         Global.sleepUntil(() -> STAND_TILE.equals(Rs2Player.getWorldLocation()), 3000);
         int picked = 0;
+        int misses = 0;
         int guard = 0;
         int maxAttempts = expected + 5;
-        while (picked < expected && guard++ < maxAttempts) {
+        while (picked < expected && guard++ < maxAttempts && misses < PICKUP_MAX_MISSES_PER_PASS) {
             if (Rs2Inventory.isFull()) {
                 log.warn("[SS] Inventory full during pickup, {} still on ground", expected - picked);
                 break;
@@ -626,20 +638,37 @@ public class SelfSufficientStartup {
                     .nearest(5);
             boolean interacted = talisman != null && talisman.click("Take");
             if (!interacted) {
-                log.warn("[SS] No ground talisman found to loot (expected {} more), retrying", expected - picked);
+                misses++;
+                log.warn("[SS] No ground talisman found to loot (expected {} more, miss {}/{}), retrying", expected - picked, misses, PICKUP_MAX_MISSES_PER_PASS);
                 Global.sleep(300, 500);
                 continue;
             }
             boolean gotOne = Global.sleepUntil(() -> (Rs2Inventory.count(1438) > before), 2000);
             if (gotOne) {
                 picked++;
+                misses = 0;
                 continue;
             }
-            log.warn("[SS] Loot interaction fired but inventory count didn't increase, retrying");
+            misses++;
+            log.warn("[SS] Loot interaction fired but inventory count didn't increase (miss {}/{}), retrying", misses, PICKUP_MAX_MISSES_PER_PASS);
             Global.sleep(300, 500);
         }
         this.groundDropCount -= picked;
         this.dropsSinceLastRefresh = 0;
+        if (picked > 0) {
+            this.pickupRetryCount = 0;
+        } else if (this.groundDropCount > 0) {
+            this.pickupRetryCount++;
+            log.warn("[SS] Pickup pass made no progress ({}/{} failed passes) - {} talisman(s) still marked on ground",
+                    this.pickupRetryCount, PICKUP_MAX_FAILED_PASSES, this.groundDropCount);
+            if (this.pickupRetryCount >= PICKUP_MAX_FAILED_PASSES) {
+                log.warn("[SS] Giving up on {} phantom ground talisman(s) after {} failed pickup passes - resuming Duke farming",
+                        this.groundDropCount, this.pickupRetryCount);
+                this.groundDropCount = 0;
+                this.dropsSinceLastRefresh = 0;
+                this.pickupRetryCount = 0;
+            }
+        }
         log.info("[SS] Pickup pass: picked={} remainingOnGround={} inv={}", picked, this.groundDropCount, Rs2Inventory.count(1438));
         if (!keepInInventory && picked > 0) {
             Rs2Walker.walkTo(DROP_TILE);
@@ -702,6 +731,7 @@ public class SelfSufficientStartup {
             this.talismanBatch++;
             this.groundDropCount = 0;
             this.dropsSinceLastRefresh = 0;
+            this.pickupRetryCount = 0;
             this.phase = Phase.GO_TO_DUKE;
             log.info("[SS] BANK_NOTE_BATCH complete, starting batch {}/{}, moving to GO_TO_DUKE", this.talismanBatch, this.batchesThisRun);
         } else {
@@ -1002,6 +1032,7 @@ public class SelfSufficientStartup {
         this.batchesThisRun = TALISMAN_BATCHES;
         this.groundDropCount = 0;
         this.dropsSinceLastRefresh = 0;
+        this.pickupRetryCount = 0;
         this.sellTries = 0;
         this.clanWarsTeleportTries = 0;
         this.lobbyWalkTries = 0;
@@ -1030,6 +1061,7 @@ public class SelfSufficientStartup {
         this.batchesThisRun = TALISMAN_BATCHES;
         this.groundDropCount = 0;
         this.dropsSinceLastRefresh = 0;
+        this.pickupRetryCount = 0;
         this.sellTries = 0;
         resetMarketState();
         this.phase = Phase.GO_TO_DUKE;
