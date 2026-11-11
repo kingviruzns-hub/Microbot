@@ -41,7 +41,6 @@ import net.runelite.client.plugins.microbot.util.walker.WalkerState;
 import net.runelite.client.plugins.microbot.globval.enums.InterfaceTab;
 import net.runelite.client.plugins.microbot.util.widget.Rs2Widget;
 
-
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.io.BufferedWriter;
@@ -74,18 +73,11 @@ import javax.inject.Singleton;
 
 import static java.nio.file.Paths.get;
 
-
-/**
- * Singleton so the plugin, HUD overlay and control surface all observe the same
- * instance. Without this, Guice creates a separate script per injection site, so
- * the overlay renders a never-started instance (status stuck on "Paused",
- * PlayerStats never initialized) while the real loop runs on the plugin's copy.
- */
 @Singleton
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.14";
+	static final String VERSION = "1.0.15";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 100;
 
@@ -94,11 +86,6 @@ public class ViruzFFABotScript extends Script
 		RuneLiteDebug.main(args);
 	}
 
-    /**
-     * Re-reads the current plugin configuration. Safe to call while the script is
-     * running, so config changes take effect without restarting the plugin.
-     * Startup-only player list imports are skipped here; see {@link #applyStartupLists()}.
-     */
     public void applyConfig() {
 		if (config == null) return;
 		this.selectedLocation = config.location() != null ? config.location().getDisplayName() : "None selected";
@@ -134,11 +121,6 @@ public class ViruzFFABotScript extends Script
 		this.focusPlayersEnabled = !focusPlayerNames.isEmpty();
 	}
 
-	/**
-	 * Applies the one-shot player list actions (unlist/whitelist) from the config.
-	 * These mutate persisted lists, so they must only run when a session starts,
-	 * not on every config change.
-	 */
 	private void applyStartupLists() {
 		if (config == null) return;
 		String unlist = config.unlist();
@@ -937,8 +919,6 @@ public class ViruzFFABotScript extends Script
 		return ThreadLocalRandom.current().nextInt(5000, 10001);
 	}
 
-
-
 	private void onLoop() {
 		try {
 			if (this.reloadNsListRequested) {
@@ -1272,7 +1252,6 @@ public class ViruzFFABotScript extends Script
 		this.safeZoneReturnTarget = null;
 		Rs2Walker.setTarget(null, "viruz: safe zone escape finished");
 	}
-
 
 	private void handleInFFA(Rs2PlayerModel localPlayer) {
 		if (!isPlayerInCombat(localPlayer)) {

@@ -149,8 +149,7 @@ public class SelfSufficientStartup {
 
     private static final int[] KEEP_ITEM_IDS = new int[]{
             MIND_RUNE_ID, WATER_RUNE_ID,
-            1042, 1381, 577, 1011, 2922, 2914, 4351, 1171, 1731,
-            995
+            1042, 1381, 577, 1011, 2922, 2914, 4351, 1171, 1731
     };
 
     private static final WorldPoint LUMBRIDGE = new WorldPoint(3222, 3218, 0);
@@ -173,6 +172,8 @@ public class SelfSufficientStartup {
 
     private boolean restockFresh = false;
 
+    private boolean bankChecked = false;
+
     public boolean restock = false;
 
     public boolean farm = false;
@@ -180,7 +181,7 @@ public class SelfSufficientStartup {
     public boolean endgame = false;
 
     public enum Phase {
-        BANK_ITEMS, GO_TO_DUKE, FARM_TALISMANS, BANK_NOTE_BATCH, WALK_TO_GE, SELL_TALISMANS, BUY_GEAR, BUY_RUNES, EQUIP_GEAR, TRAIN_TELEPORT, TRAIN_WALK, TRAIN, FINALIZE, TELEPORT_CLAN_WARS, WALK_TO_LOBBY, DONE
+        BANK_CHECK, BANK_ITEMS, GO_TO_DUKE, FARM_TALISMANS, BANK_NOTE_BATCH, WALK_TO_GE, SELL_TALISMANS, BUY_GEAR, BUY_RUNES, EQUIP_GEAR, TRAIN_TELEPORT, TRAIN_WALK, TRAIN, FINALIZE, TELEPORT_CLAN_WARS, WALK_TO_LOBBY, DONE
     }
 
     public Phase phase = Phase.BANK_ITEMS;
@@ -254,7 +255,7 @@ public class SelfSufficientStartup {
     }
 
     public void reset() {
-        this.phase = Phase.BANK_ITEMS;
+        this.phase = Phase.BANK_CHECK;
         this.talismanBatch = 1;
         this.gearIndex = 0;
         this.groundDropCount = 0;
@@ -263,6 +264,7 @@ public class SelfSufficientStartup {
         this.restock = false;
         this.farm = false;
         this.endgame = false;
+        this.bankChecked = false;
         this.finalizeTries = 0;
         this.batchesThisRun = TALISMAN_BATCHES;
         this.sellTries = 0;
@@ -283,6 +285,7 @@ public class SelfSufficientStartup {
         this.batchesThisRun = RESTOCK_BATCHES;
         this.talismanBatch = 1;
         this.gearIndex = 0;
+        this.bankChecked = true;
         resetMarketState();
         detectAndSetPhase();
     }
@@ -327,6 +330,15 @@ public class SelfSufficientStartup {
     }
 
     public void detectAndSetPhase() {
+        if (!this.bankChecked) {
+            this.bankChecked = true;
+            this.phase = Phase.BANK_CHECK;
+            log.info("[SS] Phase set to BANK_CHECK - checking the bank for required gear and training runes before farming");
+            this.groundDropCount = 0;
+            this.dropsSinceLastRefresh = 0;
+            this.pickupRetryCount = 0;
+            return;
+        }
         int talismans = Rs2Inventory.count(1438);
         int noted = Rs2Inventory.itemQuantity(1439);
         int coins = coins();
@@ -458,6 +470,9 @@ public class SelfSufficientStartup {
         dismissOnboardingTipIfPresent();
         dismissBankTutorialIfPresent();
         switch (this.phase) {
+            case BANK_CHECK:
+                doBankCheck();
+                break;
             case BANK_ITEMS:
                 doBankItems();
                 break;
@@ -506,6 +521,75 @@ public class SelfSufficientStartup {
         }
     }
 
+    private void doBankCheck() {
+        log.info("[SS] BANK_CHECK: checking the bank for required gear and training runes");
+        if (!Rs2Bank.isOpen()) {
+            Rs2Bank.walkToBankAndUseBank();
+            if (!Global.sleepUntil(Rs2Bank::isOpen, 8000)) {
+                log.warn("[SS] BANK_CHECK: bank did not open, retrying next tick");
+                return;
+            }
+        }
+        dismissBankTutorialIfPresent();
+        Rs2Bank.setWithdrawAsItem();
+        Global.sleep(300, 500);
+        log.info("[SS] BANK_CHECK: banking junk (keeping gear, runes, coins and talismans)");
+        Rs2Bank.depositAllExcept(item -> isKeptItem(item.getId())
+                || item.getId() == AIR_TALISMAN_ID
+                || item.getId() == AIR_TALISMAN_NOTED);
+        Global.sleep(400, 700);
+
+        for (int i = 0; i < GEAR_IDS.length; i++) {
+            int id = GEAR_IDS[i];
+            String name = GEAR_NAMES[i];
+            if (Rs2Equipment.isWearing(id) || Rs2Inventory.hasItem(id))
+                continue;
+            if (Rs2Bank.count(id) <= 0)
+                continue;
+            freeInventorySpaceForBankCheck();
+            log.info("[SS] BANK_CHECK: withdrawing {} from the bank", name);
+            Rs2Bank.withdrawX(id, 1);
+            if (!Global.sleepUntil(() -> Rs2Inventory.hasItem(id), 3000))
+                log.warn("[SS] BANK_CHECK: {} did not arrive in the inventory", name);
+        }
+
+        withdrawBankRunes(MIND_RUNE_ID, MIND_RUNE_NAME, MIND_RUNE_TARGET);
+        withdrawBankRunes(WATER_RUNE_ID, WATER_RUNE_NAME, WATER_RUNE_TARGET);
+
+        Rs2Bank.closeBank();
+        Global.sleepUntil(() -> !Rs2Bank.isOpen(), 3000);
+        log.info("[SS] BANK_CHECK complete: gearOwned={} gearEquipped={} mind={} water={}",
+                allGearOwnedOrEquipped(), allGearEquipped(), mindRunes(), waterRunes());
+        detectAndSetPhase();
+    }
+
+    private void withdrawBankRunes(int id, String name, int target) {
+        int have = qtyOf(id, name);
+        int need = target - have;
+        if (need <= 0)
+            return;
+        int bankQty = Rs2Bank.count(id);
+        if (bankQty <= 0)
+            return;
+        int take = Math.min(need, bankQty);
+        freeInventorySpaceForBankCheck();
+        log.info("[SS] BANK_CHECK: withdrawing {} {} from the bank (have {}, target {})", take, name, have, target);
+        Rs2Bank.withdrawX(id, take);
+        if (!Global.sleepUntil(() -> qtyOf(id, name) >= have + take, 3000))
+            log.warn("[SS] BANK_CHECK: {} did not arrive in the inventory", name);
+    }
+
+    private void freeInventorySpaceForBankCheck() {
+        if (!Rs2Inventory.isFull())
+            return;
+        log.info("[SS] BANK_CHECK: inventory full - banking talismans to make room for gear/runes");
+        if (Rs2Inventory.hasItem(AIR_TALISMAN_NOTED))
+            Rs2Bank.depositAll(AIR_TALISMAN_NOTED);
+        if (Rs2Inventory.hasItem(AIR_TALISMAN_ID))
+            Rs2Bank.depositAll(AIR_TALISMAN_ID);
+        Global.sleepUntil(() -> !Rs2Inventory.isFull(), 3000);
+    }
+
     private void doBankItems() {
         log.info("[SS] BANK_ITEMS: attempting to open bank");
         if (Rs2Equipment.isWearing("Wooden shield")) {
@@ -519,8 +603,10 @@ public class SelfSufficientStartup {
                 return;
         }
         dismissBankTutorialIfPresent();
-        log.info("[SS] Bank open, depositing everything except talismans");
-        Rs2Bank.depositAllExcept(1438, 1439);
+        log.info("[SS] Bank open, depositing everything except talismans, gear, runes and coins");
+        Rs2Bank.depositAllExcept(item -> isKeptItem(item.getId())
+                || item.getId() == AIR_TALISMAN_ID
+                || item.getId() == AIR_TALISMAN_NOTED);
         Global.sleep(400, 700);
         log.info("[SS] Deposit done, closing bank");
         Rs2Bank.closeBank();
