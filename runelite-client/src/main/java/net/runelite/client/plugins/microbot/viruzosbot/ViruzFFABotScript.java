@@ -77,9 +77,10 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.15";
+	static final String VERSION = "1.0.16";
 
-	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 100;
+	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
+	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 30;
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -242,6 +243,8 @@ public class ViruzFFABotScript extends Script
 	private static final Set<Integer> RANGE_ATTACK_ANIMATIONS = Set.of(426, 4230, 929);
 	private static final Set<Integer> MELEE_ATTACK_ANIMATIONS = Set.of(390, 386, 388, 400, 401, 407, 406, 393, 395, 412, 422, 419);
 	private static final String[] MELEE_WEAPONS = new String[]{"Rune scimitar", "Rune sword", "Rune longsword", "Rune axe", "Rune pickaxe", "Rune mace", "Rune warhammer", "Rune battleaxe", "Rune dagger", "Gilded scimitar", "Gilded spade", "Gilded pickaxe", "Gilded axe"};
+	private static final String[] MELEE_WEAPON_KEYWORDS = new String[]{"scimitar", "sword", "longsword", "axe", "pickaxe", "mace", "warhammer", "battleaxe", "dagger", "spear", "halberd", "claw", "whip", "spade", "rapier", "hasta", "maul", "bludgeon", "scythe", "flail", "sabre", "club"};
+	private static final String[] NON_MELEE_WEAPON_KEYWORDS = new String[]{"bow", "arrow", "dart", "knife", "javelin", "thrownaxe", "staff", "wand", "trident", "salamander", "chinchompa", "ballista"};
 
 	private static final long CHAT_GRAB_COOLDOWN_MS = 2500L;
 	final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
@@ -887,11 +890,16 @@ public class ViruzFFABotScript extends Script
 				return true;
 			}
 			this.selfSufficientStartupDecided = true;
-			if (totalLevel >= SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD) {
+			if (shouldSkipSelfSufficientStartup(totalLevel)) {
 				this.selfSufficientStartupDone = true;
+				this.log("Account is already melee-ready (total level " + totalLevel
+						+ ", Attack/Strength/Defence above " + SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+						+ ", melee gear equipped) - skipping self-sufficient startup");
 				return false;
 			}
-			this.log("Total level " + totalLevel + " is below " + SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
+			this.log("Total level " + totalLevel + " or melee readiness is below the skip criteria (total > "
+					+ SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD + ", Attack/Strength/Defence > "
+					+ SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD + ", melee gear equipped)"
 					+ " - running self-sufficient startup before the FFA loop");
 			this.selfSufficientStartup.reset();
 			this.selfSufficientStartup.detectAndSetPhase();
@@ -2912,6 +2920,34 @@ public class ViruzFFABotScript extends Script
 			if (meleeWeapon.equalsIgnoreCase(weaponName)) {
 				return true;
 			}
+		}
+		return false;
+	}
+
+	private boolean shouldSkipSelfSufficientStartup(int totalLevel) {
+		return totalLevel > SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
+				&& Rs2Player.getRealSkillLevel(Skill.ATTACK) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+				&& Rs2Player.getRealSkillLevel(Skill.STRENGTH) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+				&& Rs2Player.getRealSkillLevel(Skill.DEFENCE) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+				&& hasMeleeGearEquipped();
+	}
+
+	private boolean hasMeleeGearEquipped() {
+		Rs2ItemModel weapon = Rs2Equipment.get(EquipmentInventorySlot.WEAPON);
+		if (weapon == null || weapon.getName() == null) return false;
+		if (!isMeleeWeaponName(weapon.getName())) return false;
+		return Rs2Equipment.isWearing(EquipmentInventorySlot.BODY)
+				&& Rs2Equipment.isWearing(EquipmentInventorySlot.LEGS);
+	}
+
+	private boolean isMeleeWeaponName(String weaponName) {
+		if (weaponName == null) return false;
+		String lower = weaponName.toLowerCase(Locale.ROOT);
+		for (String nonMelee : NON_MELEE_WEAPON_KEYWORDS) {
+			if (lower.contains(nonMelee)) return false;
+		}
+		for (String melee : MELEE_WEAPON_KEYWORDS) {
+			if (lower.contains(melee)) return true;
 		}
 		return false;
 	}
