@@ -100,6 +100,10 @@ public class ViruzFFABotHudOverlay extends OverlayPanel
 	@Override
 	public Dimension render(Graphics2D g)
 	{
+		if (config != null && config.hideHud())
+		{
+			return null;
+		}
 		if (!Microbot.isLoggedIn() || script == null)
 		{
 			return null;

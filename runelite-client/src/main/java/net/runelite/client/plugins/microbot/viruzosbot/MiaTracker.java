@@ -97,6 +97,29 @@ public class MiaTracker {
         target.alerted = false;
     }
 
+    public boolean hasDueAlerts(long now, Set<String> activeTargets) {
+        if (activeTargets == null || activeTargets.isEmpty()) {
+            return false;
+        }
+        for (Map.Entry<String, TrackedTarget> entry : targets.entrySet()) {
+            String key = entry.getKey();
+            TrackedTarget target = entry.getValue();
+            if (target == null || !activeTargets.contains(key)) {
+                continue;
+            }
+            if (target.lastSeenMs > 0L && now - target.lastSeenMs > STALE_ENTRY_MS) {
+                continue;
+            }
+            if (!target.armed || target.alerted || target.lastSeenMs <= 0L) {
+                continue;
+            }
+            if (now - target.lastSeenMs >= MIA_TIMEOUT_MS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<MiaAlert> collectDueAlerts(long now, Set<String> activeTargets) {
         List<MiaAlert> alerts = new ArrayList<>();
         boolean changed = false;
@@ -220,6 +243,8 @@ public class MiaTracker {
                 return "Portal";
             case "middle":
                 return "Middle";
+            case "hills":
+                return "Hills";
             default:
                 return normalizedLocation;
         }

@@ -73,6 +73,20 @@ public class SelfSufficientStartup {
 
     private static final int[] GEAR_BUY_PRICE = new int[]{18000, 1500, 1000, 1000, 1000, 2500, 1000, 500, 3000};
 
+    public static final int MELEE_SKILL_THRESHOLD = 40;
+
+    private static final int[][] MELEE_GEAR_SLOT_IDS = new int[][]{
+            {1042},             // Blue partyhat
+            {1113, 1123},       // Rune chainbody / Adamant platebody
+            {1079, 1073},       // Rune platelegs / Adamant platelegs
+            {1201, 1185, 1199}, // Rune kiteshield / Rune sq shield / Adamant kiteshield
+            {1731},             // Amulet of power
+            {4351},             // Team-19 cape
+            {2922},             // Yellow gloves
+            {2914},             // Yellow boots
+            {1333}              // Rune scimitar (the only accepted melee weapon)
+    };
+
     private static final int MIND_RUNE_ID = 558;
 
     private static final int WATER_RUNE_ID = 555;
@@ -421,6 +435,42 @@ public class SelfSufficientStartup {
         return true;
     }
 
+    private int attackLvl() {
+        return Rs2Player.getRealSkillLevel(Skill.ATTACK);
+    }
+
+    private int strengthLvl() {
+        return Rs2Player.getRealSkillLevel(Skill.STRENGTH);
+    }
+
+    public boolean isMeleeReadyForFfa() {
+        return attackLvl() >= MELEE_SKILL_THRESHOLD
+                && strengthLvl() >= MELEE_SKILL_THRESHOLD
+                && defenceLvl() >= MELEE_SKILL_THRESHOLD
+                && hasMeleeGearEquippedOrInBank();
+    }
+
+    public boolean hasMeleeGearEquippedOrInBank() {
+        for (int[] slotIds : MELEE_GEAR_SLOT_IDS) {
+            if (!isMeleeSlotReady(slotIds)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isMeleeSlotReady(int[] slotIds) {
+        if (Rs2Equipment.isWearing(slotIds) || Rs2Inventory.hasItem(slotIds)) {
+            return true;
+        }
+        for (int id : slotIds) {
+            if (Rs2Bank.count(id) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void dismissOnboardingTipIfPresent() {
         Widget closeButton = Rs2Widget.getWidget(ONBOARDING_TIP_GROUP, ONBOARDING_TIP_CLOSE_CHILD);
         if (closeButton != null) {
@@ -531,6 +581,13 @@ public class SelfSufficientStartup {
             }
         }
         dismissBankTutorialIfPresent();
+        if (isMeleeReadyForFfa()) {
+            log.info("[SS] BANK_CHECK: account is melee-ready (Attack/Strength/Defence {}+, melee gear equipped or banked) - skipping self-sufficient startup", MELEE_SKILL_THRESHOLD);
+            Rs2Bank.closeBank();
+            Global.sleepUntil(() -> !Rs2Bank.isOpen(), 3000);
+            this.phase = Phase.DONE;
+            return;
+        }
         Rs2Bank.setWithdrawAsItem();
         Global.sleep(300, 500);
         log.info("[SS] BANK_CHECK: banking junk (keeping gear, runes, coins and talismans)");

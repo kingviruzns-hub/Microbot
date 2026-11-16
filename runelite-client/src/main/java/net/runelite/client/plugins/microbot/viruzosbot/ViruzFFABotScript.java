@@ -77,10 +77,10 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.16";
+	static final String VERSION = "1.0.17";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
-	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 30;
+	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 40;
 
 	public static void main(String[] args) throws Exception {
 		RuneLiteDebug.pluginsToDebug.add(ViruzFFABotPlugin.class);
@@ -243,8 +243,6 @@ public class ViruzFFABotScript extends Script
 	private static final Set<Integer> RANGE_ATTACK_ANIMATIONS = Set.of(426, 4230, 929);
 	private static final Set<Integer> MELEE_ATTACK_ANIMATIONS = Set.of(390, 386, 388, 400, 401, 407, 406, 393, 395, 412, 422, 419);
 	private static final String[] MELEE_WEAPONS = new String[]{"Rune scimitar", "Rune sword", "Rune longsword", "Rune axe", "Rune pickaxe", "Rune mace", "Rune warhammer", "Rune battleaxe", "Rune dagger", "Gilded scimitar", "Gilded spade", "Gilded pickaxe", "Gilded axe"};
-	private static final String[] MELEE_WEAPON_KEYWORDS = new String[]{"scimitar", "sword", "longsword", "axe", "pickaxe", "mace", "warhammer", "battleaxe", "dagger", "spear", "halberd", "claw", "whip", "spade", "rapier", "hasta", "maul", "bludgeon", "scythe", "flail", "sabre", "club"};
-	private static final String[] NON_MELEE_WEAPON_KEYWORDS = new String[]{"bow", "arrow", "dart", "knife", "javelin", "thrownaxe", "staff", "wand", "trident", "salamander", "chinchompa", "ballista"};
 
 	private static final long CHAT_GRAB_COOLDOWN_MS = 2500L;
 	final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
@@ -890,17 +888,20 @@ public class ViruzFFABotScript extends Script
 				return true;
 			}
 			this.selfSufficientStartupDecided = true;
-			if (shouldSkipSelfSufficientStartup(totalLevel)) {
+			if (shouldSkipSelfSufficientStartup()) {
 				this.selfSufficientStartupDone = true;
-				this.log("Account is already melee-ready (total level " + totalLevel
-						+ ", Attack/Strength/Defence above " + SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
-						+ ", melee gear equipped) - skipping self-sufficient startup");
+				this.log("Skip criteria met (melee gear owned with Attack/Strength/Defence "
+						+ SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+						+ "+, or no melee gear with total level above "
+						+ SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
+						+ ") - skipping self-sufficient startup");
 				return false;
 			}
-			this.log("Total level " + totalLevel + " or melee readiness is below the skip criteria (total > "
-					+ SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD + ", Attack/Strength/Defence > "
-					+ SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD + ", melee gear equipped)"
-					+ " - running self-sufficient startup before the FFA loop");
+			this.log("Skip criteria not met (melee gear owned needs Attack/Strength/Defence "
+					+ SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+					+ "+, otherwise total level above "
+					+ SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
+					+ ") - running self-sufficient startup before the FFA loop");
 			this.selfSufficientStartup.reset();
 			this.selfSufficientStartup.detectAndSetPhase();
 		}
@@ -2924,32 +2925,13 @@ public class ViruzFFABotScript extends Script
 		return false;
 	}
 
-	private boolean shouldSkipSelfSufficientStartup(int totalLevel) {
-		return totalLevel > SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD
-				&& Rs2Player.getRealSkillLevel(Skill.ATTACK) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
-				&& Rs2Player.getRealSkillLevel(Skill.STRENGTH) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
-				&& Rs2Player.getRealSkillLevel(Skill.DEFENCE) > SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
-				&& hasMeleeGearEquipped();
-	}
-
-	private boolean hasMeleeGearEquipped() {
-		Rs2ItemModel weapon = Rs2Equipment.get(EquipmentInventorySlot.WEAPON);
-		if (weapon == null || weapon.getName() == null) return false;
-		if (!isMeleeWeaponName(weapon.getName())) return false;
-		return Rs2Equipment.isWearing(EquipmentInventorySlot.BODY)
-				&& Rs2Equipment.isWearing(EquipmentInventorySlot.LEGS);
-	}
-
-	private boolean isMeleeWeaponName(String weaponName) {
-		if (weaponName == null) return false;
-		String lower = weaponName.toLowerCase(Locale.ROOT);
-		for (String nonMelee : NON_MELEE_WEAPON_KEYWORDS) {
-			if (lower.contains(nonMelee)) return false;
+	private boolean shouldSkipSelfSufficientStartup() {
+		if (this.selfSufficientStartup.hasMeleeGearEquippedOrInBank()) {
+			return Rs2Player.getRealSkillLevel(Skill.ATTACK) >= SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+					&& Rs2Player.getRealSkillLevel(Skill.STRENGTH) >= SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD
+					&& Rs2Player.getRealSkillLevel(Skill.DEFENCE) >= SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD;
 		}
-		for (String melee : MELEE_WEAPON_KEYWORDS) {
-			if (lower.contains(melee)) return true;
-		}
-		return false;
+		return getTotalLevel() > SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD;
 	}
 
 	private void setNextPreventLogout() {
@@ -3600,6 +3582,10 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void checkMiaTargets(long now) {
+		if (miaTracker.hasDueAlerts(now, this.attackSet)) {
+			this.runMiaVerificationScans();
+			now = System.currentTimeMillis();
+		}
 		List<MiaTracker.MiaAlert> alerts = miaTracker.collectDueAlerts(now, this.attackSet);
 		for (MiaTracker.MiaAlert alert : alerts) {
 			String message = alert.getName() + " has been MIA for more than 25 minutes.";
@@ -3611,6 +3597,71 @@ public class ViruzFFABotScript extends Script
 			}
 			this.log("MIA: " + alert.getName() + " last seen " + lastSeen + " at " + alert.getLocation());
 			this.status = "MIA: " + alert.getName();
+		}
+	}
+
+	private void runMiaVerificationScans() {
+		if (this.hillScanActive) {
+			return;
+		}
+		this.hillScanActive = true;
+		String previousStatus = this.status;
+		this.status = "MIA verification scan";
+		this.log("MIA verification: scanning Lobby, Portal, Middle, Hills before flagging MIA targets");
+		try {
+			WorldArea[] scanAreas = {
+					this.AT_LOBBY,
+					this.areaMap.get("Portal"),
+					this.areaMap.get("Middle"),
+					this.areaMap.get("Hills")
+			};
+			String[] scanAreaNames = {"Lobby", "Portal", "Middle", "Hills"};
+
+			for (int i = 0; i < scanAreas.length; i++) {
+				WorldArea destArea = scanAreas[i];
+				String areaName = scanAreaNames[i];
+				if (destArea == null) {
+					this.log("MIA verification scan: could not find area for " + areaName);
+					continue;
+				}
+
+				this.status = "MIA verification: walking to " + areaName;
+				Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+				if (!playerExists(localPlayer)) {
+					this.log("MIA verification scan: local player not ready");
+					return;
+				}
+
+				WorldPoint destTile = randomAreaTile(destArea);
+				int maxAttempts = 10;
+				for (int attempt = 0; attempt < maxAttempts; attempt++) {
+					localPlayer = Rs2Player.getLocalPlayer();
+					if (!playerExists(localPlayer)) break;
+					if (localPlayer.getWorldLocation() != null && destArea.contains(localPlayer.getWorldLocation())) break;
+					Rs2Walker.walkTo(destTile);
+					this.sleepWithFatigue(1200, 2500);
+				}
+
+				localPlayer = Rs2Player.getLocalPlayer();
+				if (playerExists(localPlayer)
+						&& localPlayer.getWorldLocation() != null && destArea.contains(localPlayer.getWorldLocation())) {
+					this.status = "MIA verification: scanning at " + areaName;
+					sessionTracker.recordScan();
+					this.scanNonTargets(localPlayer);
+					nonTargetTracker.tickSave();
+					miaTracker.tickSave();
+					this.sleepWithFatigue(500, 1500);
+				} else {
+					this.log("MIA verification scan: failed to reach " + areaName);
+				}
+			}
+			miaTracker.saveTrackerInfo();
+		} finally {
+			this.hillScanActive = false;
+			this.hillScanEnabled = false;
+			if (this.status != null && this.status.startsWith("MIA verification")) {
+				this.status = previousStatus != null ? previousStatus : "Waiting";
+			}
 		}
 	}
 

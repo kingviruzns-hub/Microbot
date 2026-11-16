@@ -48,7 +48,7 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "switchPrayers", name = "Switch prayers", description = "Switch prayers", position = 4, section = toggles)
     default boolean switchPrayers() { return false; }
 
-    @ConfigItem(keyName = "freeRoam", name = "Free roam", description = "Free roam", position = 5, section = toggles)
+    @ConfigItem(keyName = "freeRoam", name = "Persistant", description = "Bypass Anti-Drag", position = 5, section = toggles)
     default boolean freeRoam() { return false; }
 
     @ConfigItem(keyName = "protectBluePhats", name = "Protect BluePhats", description = "Protect BluePhats", position = 6, section = toggles)
@@ -63,7 +63,7 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "lureMulti", name = "Lure Multi", description = "Lure Multi", position = 9, section = toggles)
     default boolean lureMulti() { return false; }
 
-    @ConfigItem(keyName = "scanHills", name = "Scan Hills", description = "Scan Hills", position = 10, section = toggles)
+    @ConfigItem(keyName = "scanHills", name = "Run Tracker Scans", description = "Force a Tracker Scan update", position = 10, section = toggles)
     default boolean scanHills() { return false; }
 
     @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 11, section = toggles)
@@ -71,6 +71,9 @@ public interface ViruzFFABotConfig extends Config {
 
     @ConfigItem(keyName = "dragMode", name = "Drag-Mode", description = "Attack targets in Portal, wait for retaliation, then drag them east or west out of the Portal area", position = 12, section = toggles)
     default boolean dragMode() { return false; }
+
+    @ConfigItem(keyName = "hideHud", name = "Toggle HUD", description = "Hide/unhide the Viruz FFA Bot HUD overlay", position = 13, section = toggles)
+    default boolean hideHud() { return false; }
 
     @ConfigSection(name = "Location", description = "Combat area selection", position = 1)
     String locationSection = "locationSection";

@@ -47,7 +47,9 @@ public class ViruzFFABotPlugin extends Plugin {
 	protected void startUp() throws Exception {
 		script.setConfig(config);
 		botControl.setScript(script);
-		overlayManager.add(hudOverlay);
+		if (config == null || !config.hideHud()) {
+			overlayManager.add(hudOverlay);
+		}
 		script.run();
 		botControl.run();
 	}
@@ -77,6 +79,15 @@ public class ViruzFFABotPlugin extends Plugin {
 		}
 		if ("reloadNsList".equals(key)) {
 			script.reloadNsList();
+			return;
+		}
+		if ("hideHud".equals(key)) {
+			if (config.hideHud()) {
+				overlayManager.remove(hudOverlay);
+			} else {
+				overlayManager.remove(hudOverlay);
+				overlayManager.add(hudOverlay);
+			}
 			return;
 		}
 
