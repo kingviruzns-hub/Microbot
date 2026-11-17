@@ -97,7 +97,12 @@ public class MiaTracker {
         target.alerted = false;
     }
 
-    public boolean hasDueAlerts(long now, Set<String> activeTargets) {
+    /**
+     * True when at least one active target is armed for MIA tracking, which means a
+     * periodic verification sweep is worth running. The sweep refreshes every tracked
+     * target at once instead of scanning per target.
+     */
+    public boolean hasArmedTargets(long now, Set<String> activeTargets) {
         if (activeTargets == null || activeTargets.isEmpty()) {
             return false;
         }
@@ -110,10 +115,7 @@ public class MiaTracker {
             if (target.lastSeenMs > 0L && now - target.lastSeenMs > STALE_ENTRY_MS) {
                 continue;
             }
-            if (!target.armed || target.alerted || target.lastSeenMs <= 0L) {
-                continue;
-            }
-            if (now - target.lastSeenMs >= MIA_TIMEOUT_MS) {
+            if (target.armed) {
                 return true;
             }
         }

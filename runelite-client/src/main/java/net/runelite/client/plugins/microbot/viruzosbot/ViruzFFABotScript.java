@@ -77,7 +77,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.17";
+	static final String VERSION = "1.0.18";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
 	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 40;
@@ -302,7 +302,10 @@ public class ViruzFFABotScript extends Script
 	private volatile boolean stopFarmModeRequested = false;
 	private long nextNonTargetScanMs = 0L;
 	private long nextMiaCheckMs = 0L;
+	private long nextMiaScanMs = 0L;
 	private static final long MIA_CHECK_INTERVAL_MS = 10_000L;
+	private static final long MIA_SCAN_MIN_INTERVAL_MS = 25L * 60L * 1000L;
+	private static final long MIA_SCAN_MAX_INTERVAL_MS = 35L * 60L * 1000L;
 	private long nextTrackerInfoSaveMs = System.currentTimeMillis() + 60_000L;
 	private long nextMindRuneCheckMs = System.currentTimeMillis() + 10L * 60L * 1000L;
 	private long noValidTargetCooldownUntilMs = 0L;
@@ -837,6 +840,7 @@ public class ViruzFFABotScript extends Script
 		this.nextAntiBanAtMs = System.currentTimeMillis() + Rs2Random.between(120000, 240000);
 		this.nextAttackListReloadAtMs = System.currentTimeMillis() + ATTACK_LIST_RELOAD_INTERVAL_MS;
 		this.nextMindRuneCheckMs = System.currentTimeMillis() + 10L * 60L * 1000L;
+		this.nextMiaScanMs = System.currentTimeMillis() + Rs2Random.between((int) MIA_SCAN_MIN_INTERVAL_MS, (int) MIA_SCAN_MAX_INTERVAL_MS);
 		this.nextUltradianUpdateMs = System.currentTimeMillis() + Rs2Random.between(600000, 1200000);
 		lastSwitchLevelForCurrentStyle = Rs2Player.getRealSkillLevel(Skill.ATTACK);
 		nextStyleSwitchGain = ThreadLocalRandom.current().nextInt(4, 7);
@@ -3582,10 +3586,17 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void checkMiaTargets(long now) {
-		if (miaTracker.hasDueAlerts(now, this.attackSet)) {
-			this.runMiaVerificationScans();
-			now = System.currentTimeMillis();
+		// MIA verification is a single periodic sweep of every tracked target, not a
+		// per-target scan. Wait for the randomized 25-35 minute window before running it.
+		if (!miaTracker.hasArmedTargets(now, this.attackSet)) {
+			return;
 		}
+		if (now < this.nextMiaScanMs || this.hillScanActive) {
+			return;
+		}
+		this.runMiaVerificationScans();
+		now = System.currentTimeMillis();
+		this.nextMiaScanMs = now + Rs2Random.between((int) MIA_SCAN_MIN_INTERVAL_MS, (int) MIA_SCAN_MAX_INTERVAL_MS);
 		List<MiaTracker.MiaAlert> alerts = miaTracker.collectDueAlerts(now, this.attackSet);
 		for (MiaTracker.MiaAlert alert : alerts) {
 			String message = alert.getName() + " has been MIA for more than 25 minutes.";
@@ -3607,15 +3618,16 @@ public class ViruzFFABotScript extends Script
 		this.hillScanActive = true;
 		String previousStatus = this.status;
 		this.status = "MIA verification scan";
-		this.log("MIA verification: scanning Lobby, Portal, Middle, Hills before flagging MIA targets");
+		this.log("MIA verification: scanning all monitored areas to refresh every tracked target before flagging MIA targets");
 		try {
 			WorldArea[] scanAreas = {
 					this.AT_LOBBY,
+					this.SAFE_ZONE,
 					this.areaMap.get("Portal"),
 					this.areaMap.get("Middle"),
 					this.areaMap.get("Hills")
 			};
-			String[] scanAreaNames = {"Lobby", "Portal", "Middle", "Hills"};
+			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle", "Hills"};
 
 			for (int i = 0; i < scanAreas.length; i++) {
 				WorldArea destArea = scanAreas[i];
