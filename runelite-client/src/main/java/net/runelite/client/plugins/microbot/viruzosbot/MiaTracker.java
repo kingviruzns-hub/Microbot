@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class MiaTracker {
     public static final long MIA_TIMEOUT_MS = 25L * 60L * 1000L;
+    public static final long SCAN_UPDATE_COOLDOWN_MS = 10L * 60L * 1000L;
 
     private static final long SAVE_INTERVAL_MS = 10_000L;
     private static final long STALE_ENTRY_MS = 7L * 24L * 60L * 60L * 1000L;
@@ -28,6 +29,7 @@ public class MiaTracker {
     private final Map<String, TrackedTarget> targets = new ConcurrentHashMap<>();
     private final String filePath;
     private volatile String activeLocation = "";
+    private volatile long lastScanUpdateMs = 0L;
     private long nextSaveMs = 0L;
 
     public MiaTracker() {
@@ -75,6 +77,7 @@ public class MiaTracker {
     }
 
     public void recordSighting(String playerName, String location, long now) {
+        if (!isScanUpdateAllowed(now)) return;
         String key = normalizeName(playerName);
         if (key.isEmpty()) return;
         String normalizedLocation = normalizeLocation(location);
@@ -85,6 +88,12 @@ public class MiaTracker {
         target.location = canonicalLocation(normalizedLocation);
         target.lastSeenMs = Math.max(target.lastSeenMs, now);
         target.alerted = false;
+        lastScanUpdateMs = now;
+    }
+
+    private boolean isScanUpdateAllowed(long now) {
+        if (lastScanUpdateMs <= 0L || now == lastScanUpdateMs) return true;
+        return now > lastScanUpdateMs && now - lastScanUpdateMs >= SCAN_UPDATE_COOLDOWN_MS;
     }
 
     public void recordEngagement(String playerName, String targetLocation, String localLocation, long now) {

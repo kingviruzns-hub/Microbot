@@ -77,7 +77,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.18";
+	static final String VERSION = "1.0.19";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
 	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 40;
