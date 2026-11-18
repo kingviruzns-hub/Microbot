@@ -57,22 +57,19 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "report", name = "Report targets", description = "Report targets", position = 7, section = toggles)
     default boolean report() { return false; }
 
-    @ConfigItem(keyName = "chatGrabber", name = "Chat grabber", description = "Chat grabber", position = 8, section = toggles)
-    default boolean chatGrabber() { return false; }
-
-    @ConfigItem(keyName = "lureMulti", name = "Lure Multi", description = "Lure Multi", position = 9, section = toggles)
+    @ConfigItem(keyName = "lureMulti", name = "Lure Multi", description = "Lure Multi", position = 8, section = toggles)
     default boolean lureMulti() { return false; }
 
-    @ConfigItem(keyName = "scanHills", name = "Run Tracker Scans", description = "Force a Tracker Scan update", position = 10, section = toggles)
+    @ConfigItem(keyName = "scanHills", name = "Run Tracker Scans", description = "Force a Tracker Scan update", position = 9, section = toggles)
     default boolean scanHills() { return false; }
 
-    @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 11, section = toggles)
+    @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 10, section = toggles)
     default boolean noDrag() { return false; }
 
-    @ConfigItem(keyName = "dragMode", name = "Drag-Mode", description = "Attack targets in Portal, wait for retaliation, then drag them east or west out of the Portal area", position = 12, section = toggles)
+    @ConfigItem(keyName = "dragMode", name = "Drag-Mode", description = "Attack targets in Portal, wait for retaliation, then drag them east or west out of the Portal area", position = 11, section = toggles)
     default boolean dragMode() { return false; }
 
-    @ConfigItem(keyName = "hideHud", name = "Toggle HUD", description = "Hide/unhide the Viruz FFA Bot HUD overlay", position = 13, section = toggles)
+    @ConfigItem(keyName = "hideHud", name = "Toggle HUD", description = "Hide/unhide the Viruz FFA Bot HUD overlay", position = 12, section = toggles)
     default boolean hideHud() { return false; }
 
     @ConfigSection(name = "Location", description = "Combat area selection", position = 1)

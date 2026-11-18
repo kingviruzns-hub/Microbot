@@ -77,7 +77,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.19";
+	static final String VERSION = "1.0.20";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
 	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 40;
@@ -99,7 +99,6 @@ public class ViruzFFABotScript extends Script
 		this.freeRoamEnabled = config.freeRoam();
 		this.protectBluePhatsEnabled = config.protectBluePhats();
 		this.reportEnabled = config.report();
-		this.chatGrabberEnabled.set(config.chatGrabber());
 		this.lureMultiEnabled = config.lureMulti();
 		this.noDragEnabled = config.noDrag();
 		this.dragModeEnabled = config.dragMode();
@@ -245,8 +244,6 @@ public class ViruzFFABotScript extends Script
 	private static final Set<Integer> MELEE_ATTACK_ANIMATIONS = Set.of(390, 386, 388, 400, 401, 407, 406, 393, 395, 412, 422, 419);
 	private static final String[] MELEE_WEAPONS = new String[]{"Rune scimitar", "Rune sword", "Rune longsword", "Rune axe", "Rune pickaxe", "Rune mace", "Rune warhammer", "Rune battleaxe", "Rune dagger", "Gilded scimitar", "Gilded spade", "Gilded pickaxe", "Gilded axe"};
 
-	private static final long CHAT_GRAB_COOLDOWN_MS = 2500L;
-	final AtomicBoolean chatGrabberEnabled = new AtomicBoolean(false);
 	boolean focusPlayersEnabled = false;
 	boolean lureMultiEnabled = false;
 	private boolean hillScanActive = false;
@@ -258,7 +255,6 @@ public class ViruzFFABotScript extends Script
 	@Setter
     private ViruzFFABotConfig config;
 	private final Set<String> focusPlayerNames = new HashSet<>();
-	private final Map<String, Long> lastGrabbedBySender = new HashMap<>();
 	private long nextReportAttemptAtMs = 0L;
 	private long nextReportListReloadAtMs = 0L;
 	private static final long REPORT_ATTEMPT_MIN_INTERVAL_MS = 45_000L;
@@ -349,7 +345,6 @@ public class ViruzFFABotScript extends Script
 		if (type == ChatEventType.CLAN_CHAT) {
 			clanMembers.add(sender.toLowerCase(Locale.ROOT).trim());
 		}
-		grabChatMessage(message);
 	}
 
 	private ChatEventType resolveType(ChatMessage message) {
@@ -371,40 +366,6 @@ public class ViruzFFABotScript extends Script
 		} catch (Exception e) {
 			return ChatEventType.OTHER;
 		}
-	}
-
-	private void grabChatMessage(ChatMessage message) {
-		if (!chatGrabberEnabled.get()) return;
-		String senderRaw = message.getName();
-		String content = message.getMessage();
-		if (senderRaw == null || content == null) return;
-		String sender = senderRaw.replace('\u00A0', ' ');
-		long now = System.currentTimeMillis();
-		long last = lastGrabbedBySender.getOrDefault(sender.toLowerCase(Locale.ROOT), 0L);
-		if (now - last < CHAT_GRAB_COOLDOWN_MS) return;
-		lastGrabbedBySender.put(sender.toLowerCase(Locale.ROOT), now);
-		String prefix = "";
-		WorldPoint currentTile = getLocalPlayerLocation();
-		if (currentTile != null) {
-			if (AT_LOBBY.contains(currentTile)) {
-				prefix = "[Lobby] ";
-			} else if (IN_FFA.contains(currentTile)) {
-				String subAreaName = "";
-				for (Map.Entry<String, WorldArea> entry : areaMap.entrySet()) {
-					if (entry.getValue().contains(currentTile)) {
-						subAreaName = entry.getKey();
-						break;
-					}
-				}
-				if (!subAreaName.isEmpty()) {
-					prefix = "[FFA - " + subAreaName + "] ";
-				} else {
-					prefix = "[FFA] ";
-				}
-			}
-		}
-		String safe = content.replace("\\", "\\\\").replace("\"", "\\\"");
-		DiscordWebhook2.sendMessage("📩 " + prefix + "**" + sender + "**: " + safe);
 	}
 
 	private void sendDiscordEmbed(String event) {
