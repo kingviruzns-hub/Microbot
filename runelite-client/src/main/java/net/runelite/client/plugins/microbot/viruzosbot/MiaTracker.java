@@ -24,16 +24,23 @@ public class MiaTracker {
 
     private static final long SAVE_INTERVAL_MS = 10_000L;
     private static final long STALE_ENTRY_MS = 7L * 24L * 60L * 60L * 1000L;
-    private static final Set<String> MONITORED_LOCATIONS =
-            Set.of("lobby", "safe zone", "safezone", "portal", "middle", "hills");
 
     private final Map<String, TrackedTarget> targets = new ConcurrentHashMap<>();
     private final String filePath;
+    private volatile String activeLocation = "";
     private long nextSaveMs = 0L;
 
     public MiaTracker() {
         this.filePath = Config.getMiaTargetsFilePath();
         load();
+    }
+
+    public void setActiveLocation(ViruzFFABotConfig.Location location) {
+        if (location == null || location == ViruzFFABotConfig.Location.NONE_SELECTED) {
+            this.activeLocation = "";
+            return;
+        }
+        this.activeLocation = normalizeLocation(location.getDisplayName());
     }
 
     @Getter
@@ -71,7 +78,7 @@ public class MiaTracker {
         String key = normalizeName(playerName);
         if (key.isEmpty()) return;
         String normalizedLocation = normalizeLocation(location);
-        if (isMonitoredLocation(normalizedLocation)) return;
+        if (matchesActiveLocation(normalizedLocation)) return;
 
         TrackedTarget target = targets.computeIfAbsent(key, k -> new TrackedTarget(playerName));
         target.name = playerName;
@@ -85,8 +92,7 @@ public class MiaTracker {
         if (key.isEmpty()) return;
         String targetArea = normalizeLocation(targetLocation);
         String localArea = normalizeLocation(localLocation);
-        if (isMonitoredLocation(targetArea) || isMonitoredLocation(localArea)) return;
-        if (!targetArea.equals(localArea)) return;
+        if (matchesActiveLocation(targetArea) || matchesActiveLocation(localArea)) return;
 
         TrackedTarget target = targets.computeIfAbsent(key, k -> new TrackedTarget(playerName));
         target.name = playerName;
@@ -97,11 +103,24 @@ public class MiaTracker {
         target.alerted = false;
     }
 
-    /**
-     * True when at least one active target is armed for MIA tracking, which means a
-     * periodic verification sweep is worth running. The sweep refreshes every tracked
-     * target at once instead of scanning per target.
-     */
+    public void prune(long now, Set<String> activeTargets) {
+        if (activeTargets == null || activeTargets.isEmpty()) {
+            return;
+        }
+        boolean changed = false;
+        for (Iterator<Map.Entry<String, TrackedTarget>> it = targets.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, TrackedTarget> entry = it.next();
+            TrackedTarget target = entry.getValue();
+            if (target == null || !activeTargets.contains(entry.getKey())
+                    || (!activeLocation.isEmpty() && matchesActiveLocation(normalizeLocation(target.location)))
+                    || (target.lastSeenMs > 0L && now - target.lastSeenMs > STALE_ENTRY_MS)) {
+                it.remove();
+                changed = true;
+            }
+        }
+        if (changed) save();
+    }
+
     public boolean hasArmedTargets(long now, Set<String> activeTargets) {
         if (activeTargets == null || activeTargets.isEmpty()) {
             return false;
@@ -109,7 +128,8 @@ public class MiaTracker {
         for (Map.Entry<String, TrackedTarget> entry : targets.entrySet()) {
             String key = entry.getKey();
             TrackedTarget target = entry.getValue();
-            if (target == null || !activeTargets.contains(key)) {
+            if (target == null || !activeTargets.contains(key)
+                    || matchesActiveLocation(normalizeLocation(target.location))) {
                 continue;
             }
             if (target.lastSeenMs > 0L && now - target.lastSeenMs > STALE_ENTRY_MS) {
@@ -139,6 +159,9 @@ public class MiaTracker {
             if (target.lastSeenMs > 0L && now - target.lastSeenMs > STALE_ENTRY_MS) {
                 it.remove();
                 changed = true;
+                continue;
+            }
+            if (matchesActiveLocation(normalizeLocation(target.location))) {
                 continue;
             }
             if (!target.armed || target.alerted || target.lastSeenMs <= 0L) {
@@ -231,8 +254,8 @@ public class MiaTracker {
         return value;
     }
 
-    private static boolean isMonitoredLocation(String normalizedLocation) {
-        return !MONITORED_LOCATIONS.contains(normalizedLocation);
+    private boolean matchesActiveLocation(String normalizedLocation) {
+        return activeLocation.isEmpty() || !activeLocation.equals(normalizedLocation);
     }
 
     private static String canonicalLocation(String normalizedLocation) {

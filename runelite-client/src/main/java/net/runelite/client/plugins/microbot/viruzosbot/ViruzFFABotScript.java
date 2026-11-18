@@ -90,6 +90,7 @@ public class ViruzFFABotScript extends Script
     public void applyConfig() {
 		if (config == null) return;
 		this.selectedLocation = config.location() != null ? config.location().getDisplayName() : "None selected";
+		miaTracker.setActiveLocation(config.location());
 		this.attackEnabled = config.attack();
 		this.walkToTargetEnabled = config.walkToTarget();
 		this.quickprayersEnabled = config.quickPrayer();
@@ -3586,12 +3587,17 @@ public class ViruzFFABotScript extends Script
 	}
 
 	private void checkMiaTargets(long now) {
+		miaTracker.prune(now, this.attackSet);
 		// MIA verification is a single periodic sweep of every tracked target, not a
 		// per-target scan. Wait for the randomized 25-35 minute window before running it.
 		if (!miaTracker.hasArmedTargets(now, this.attackSet)) {
 			return;
 		}
 		if (now < this.nextMiaScanMs || this.hillScanActive) {
+			return;
+		}
+		Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
+		if (localPlayer == null || isPlayerInCombat(localPlayer)) {
 			return;
 		}
 		this.runMiaVerificationScans();
@@ -3618,20 +3624,22 @@ public class ViruzFFABotScript extends Script
 		this.hillScanActive = true;
 		String previousStatus = this.status;
 		this.status = "MIA verification scan";
-		this.log("MIA verification: scanning all monitored areas to refresh every tracked target before flagging MIA targets");
+		List<WorldArea> scanAreas = new ArrayList<>();
+		List<String> scanAreaNames = new ArrayList<>();
+		scanAreas.add(this.AT_LOBBY);
+		scanAreaNames.add("Lobby");
+		if (this.currentArea != null) {
+			scanAreas.add(this.currentArea);
+			scanAreaNames.add(this.selectedLocation);
+		} else {
+			this.log("MIA verification scan: no Location selected, only Lobby will be scanned");
+		}
+		this.log("MIA verification: scanning Lobby and "
+				+ (this.currentArea != null ? this.selectedLocation : "no selected Location") + " only");
 		try {
-			WorldArea[] scanAreas = {
-					this.AT_LOBBY,
-					this.SAFE_ZONE,
-					this.areaMap.get("Portal"),
-					this.areaMap.get("Middle"),
-					this.areaMap.get("Hills")
-			};
-			String[] scanAreaNames = {"Lobby", "Safezone", "Portal", "Middle", "Hills"};
-
-			for (int i = 0; i < scanAreas.length; i++) {
-				WorldArea destArea = scanAreas[i];
-				String areaName = scanAreaNames[i];
+			for (int i = 0; i < scanAreas.size(); i++) {
+				WorldArea destArea = scanAreas.get(i);
+				String areaName = scanAreaNames.get(i);
 				if (destArea == null) {
 					this.log("MIA verification scan: could not find area for " + areaName);
 					continue;
