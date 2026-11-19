@@ -77,7 +77,7 @@ import static java.nio.file.Paths.get;
 public class ViruzFFABotScript extends Script
 {
 	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ViruzFFABotScript.class);
-	static final String VERSION = "1.0.20";
+	static final String VERSION = "1.0.21";
 
 	private static final int SELF_SUFFICIENT_TOTAL_LEVEL_THRESHOLD = 120;
 	private static final int SELF_SUFFICIENT_COMBAT_LEVEL_THRESHOLD = 40;
@@ -105,7 +105,6 @@ public class ViruzFFABotScript extends Script
 		if (this.lureMultiEnabled) {
 			this.noDragEnabled = false;
 		}
-		this.hillScanEnabled = config.scanHills();
 
 		refreshSelectedArea();
 
@@ -247,7 +246,6 @@ public class ViruzFFABotScript extends Script
 	boolean focusPlayersEnabled = false;
 	boolean lureMultiEnabled = false;
 	private boolean hillScanActive = false;
-	boolean hillScanEnabled = false;
 	boolean noDragEnabled = false;
 	@Getter
 	@Setter
@@ -272,6 +270,7 @@ public class ViruzFFABotScript extends Script
 	private static final long RANDOM_EVENT_CHECK_INTERVAL_MS = 5_000L;
 	private long nextAttackListReloadAtMs = 0L;
 	private volatile boolean reloadNsListRequested = false;
+	private volatile boolean trackerScanRequested = false;
 	double energyBoost = 0.0;
 	private long lastEnergyBoostTime = System.currentTimeMillis();
 	private long nextEnergyBoostCheck = System.currentTimeMillis() + 60000;
@@ -899,6 +898,11 @@ public class ViruzFFABotScript extends Script
 			if (this.reloadNsListRequested) {
 				this.reloadNsListRequested = false;
 				this.reloadNsListNow();
+			}
+			if (this.trackerScanRequested && !this.hillScanActive) {
+				this.trackerScanRequested = false;
+				this.runTrackerScans();
+				return;
 			}
 			Rs2PlayerModel localPlayer = Rs2Player.getLocalPlayer();
 			if (localPlayer == null) return;
@@ -2947,8 +2951,6 @@ public class ViruzFFABotScript extends Script
 				this.walkAdjust();
 			} else if (roll <= 400) {
 				this.doubleTabCycle();
-			} else if (roll <= 449) {
-				this.runTrackerScans();
 			} else if (roll <= 455) {
 				Microbot.naturalMouse.moveOffScreen();
 				this.sleepWithFatigue(2000, 5000);
@@ -3073,8 +3075,20 @@ public class ViruzFFABotScript extends Script
 			}
 		} finally {
 			this.hillScanActive = false;
-			this.hillScanEnabled = false;
+			this.trackerScanRequested = false;
 			this.status = "Trackers Scan finished";
+			this.resetUpdateTrackersToggle();
+		}
+	}
+
+	private void resetUpdateTrackersToggle() {
+		try {
+			if (Microbot.getConfigManager() != null) {
+				Microbot.getConfigManager().setConfiguration(
+						ViruzFFABotConfig.configGroup, "updateTrackers", false);
+			}
+		} catch (Exception e) {
+			this.log("Could not reset Update Trackers toggle: " + e.getMessage());
 		}
 	}
 
@@ -3639,7 +3653,6 @@ public class ViruzFFABotScript extends Script
 			miaTracker.saveTrackerInfo();
 		} finally {
 			this.hillScanActive = false;
-			this.hillScanEnabled = false;
 			if (this.status != null && this.status.startsWith("MIA verification")) {
 				this.status = previousStatus != null ? previousStatus : "Waiting";
 			}
@@ -4301,6 +4314,10 @@ public class ViruzFFABotScript extends Script
 
 	public void reloadNsList() {
 		this.reloadNsListRequested = true;
+	}
+
+	public void requestTrackerScan() {
+		this.trackerScanRequested = true;
 	}
 
 	public void beginFarmMode() {

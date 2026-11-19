@@ -90,6 +90,12 @@ public class ViruzFFABotPlugin extends Plugin {
 			}
 			return;
 		}
+		if ("updateTrackers".equals(key)) {
+			if (config.updateTrackers()) {
+				script.requestTrackerScan();
+			}
+			return;
+		}
 
 		script.applyConfig();
 	}

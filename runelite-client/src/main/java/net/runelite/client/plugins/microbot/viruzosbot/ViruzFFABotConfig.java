@@ -60,8 +60,8 @@ public interface ViruzFFABotConfig extends Config {
     @ConfigItem(keyName = "lureMulti", name = "Lure Multi", description = "Lure Multi", position = 8, section = toggles)
     default boolean lureMulti() { return false; }
 
-    @ConfigItem(keyName = "scanHills", name = "Run Tracker Scans", description = "Force a Tracker Scan update", position = 9, section = toggles)
-    default boolean scanHills() { return false; }
+    @ConfigItem(keyName = "updateTrackers", name = "Update Trackers", description = "Run a full tracker scan now, then automatically turn this off when complete", position = 9, section = toggles)
+    default boolean updateTrackers() { return false; }
 
     @ConfigItem(keyName = "noDrag", name = "No Drag", description = "No Drag", position = 10, section = toggles)
     default boolean noDrag() { return false; }
